@@ -60,7 +60,7 @@ float scaleVolts(int val) {
 
 /*Draws the value and chart to the screen*/
 void draw()
-{
+{   
   //As long as we're getting enough bytes to at least be the data identifier keep looping and reading
   while (port.available() >= 3) {
     //Get the incoming data identifier from the port
@@ -76,11 +76,12 @@ void draw()
   //Loop through and store the incoming values
   for (int i = 0;i < width - 1;i++)
     values_front[i] = values_front[i+1];
-    values_front[width-1] = val_front;
-  
+    values_front[width-1] = val_front;        
+    
     //Background is black and lines/text are white
     background(0);
     stroke(255);
+        
     
     //Step through the values and draw a corresponding line and text
     for (int x=1; x<width; x++) {
@@ -95,6 +96,18 @@ void draw()
       //Display the current value as text
       fill(255);
       stroke(255);
-      text("Voltage: " + scaleVolts(val_front),20,20);         
+      text("Voltage: " + round(scaleVolts(val_front) * 1000.0) / 1000.0,20,20);         
   }
+  
+  //Draw the start/stop button    
+  //fill(#00FF00); //Green
+  fill(#FF0000); //Red
+  rect(400,10,100,20);
+  //Handle the mount click on the button
+  /*if(mousePressed){
+    //if(mouseX > x && mouseX < x + w && mouseY > y && mouseY < y + h){      
+    //if(mouseX > 400 && mouseX < 400 + 100 && mouseY > 10 && mouseY < 10 + 20){      
+      fill(#00FF00);      
+    //}
+  }*/
 }
