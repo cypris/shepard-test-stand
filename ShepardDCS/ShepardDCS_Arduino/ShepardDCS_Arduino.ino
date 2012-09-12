@@ -20,9 +20,19 @@
  * temperature at the throat of the motor.
  */
  
+#include "Adafruit_MAX31855.h"
+ 
 int thrustPin = A0; //A0 is the input pin for FSR (thrust measurement)
 int thrustValue = 0; //The value 0-1023 from the FSR's analog pin
+double tempValue = 0.0; //The value (in Celsius) of the thermocouple
+unsigned long timeValue = 0; //The timestamp in milliseconds since the program started
+int thermoDO = 3; //The "Data Out" digital pin
+int thermoCS = 4; //The "Chip Select" digital pin
+int thermoCLK = 5; //The "Clock" digital pin
 int ledPin = 13; //The LED pin is used in serial comms
+
+//Set the Adafruit breakout board up for use
+Adafruit_MAX31855 thermocouple(thermoCLK, thermoCS, thermoDO);
 
 /*Sets the sketch up for use*/
 void setup() {
@@ -31,20 +41,38 @@ void setup() {
   
   //Use the LED pin as an output pin
   pinMode(ledPin, OUTPUT);
+  
+  //Wait for the MAX31855 chip to stabilize
+  delay(500);
 }
 
 /*Step through continuously reading the sensor values*/
 void loop() {
   //Read the current value from the FSR (thrust sensor)
   thrustValue = analogRead(thrustPin);
+  //Read the current value from the thermocouple
+  tempValue = thermocouple.readCelsius();
+  //Read the current time value in milliseconds
+  timeValue = millis();
 
   //Send the thrust value to the Processing app
   Serial.write(0xff); //ID/control byte so Processing can distinguish sensors
   Serial.write((thrustValue >> 8) & 0xff); //The first byte
   Serial.write(thrustValue & 0xff); //The second byte
   
-  //Serial.write( 0xfe);
-  //Serial.write( (sensorValue_back >> 8) & 0xff);
-  //Serial.write( sensorValue_back & 0xff);
-  //delay(100);
+  //Send the temperature value to the Processing app
+  Serial.write(0xfe); //ID/control byte so Processing can distinguish sensors
+  Serial.print(tempValue);
+  
+  //The following is handled on the PC side of things because trying to 
+  //ship this value over serial in a reliable manner proved to be too much trouble.
+  //This time stamp really should be provided by the Arduino and not the Processing
+  //app though.
+  //Send the time value to the Processing app
+  /*Serial.write(0xfd); //ID/control byte so Processing can distinguish sensors
+  Serial.print(timeValue);*/
+
+  //There should be a fairly large delay here, but we're going to
+  //deal with some errors in order to get a faster sample rate.
+  delay(2);
 }
