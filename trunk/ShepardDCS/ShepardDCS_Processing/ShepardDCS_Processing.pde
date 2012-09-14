@@ -20,35 +20,36 @@
  * temperature at the throat of the motor.
  */
 
- /*The serial port configuration is set up to work with Linux and not Windows*/
-import processing.serial.*;
-import controlP5.*;
+import processing.serial.*; //The serial port configuration
+import controlP5.*; //Our graphics library
 
 //Global variables
 boolean isRecording = false; //Tracks whether or not the user wants to record
 boolean aboveZero = false; //Tracks whether or not the voltage has gone above zero
 int dataID; //The ID used to separate between types of data coming from the Arduino
-int curThrust; //The current thrust data value coming back from the Arduino
+int curThrustRaw; //The current thrust data value in 0 to 1023 format
 int numSamples = 1; //The number of samples taken so far
 int X_AXIS = 1; //Specifier for an X-axis gradient
 int Y_AXIS = 2; //Specifier for a Y-axis gradient
 int numOfTicks = 1; //The number of ticks that will be drawn on the X axis
+int bufferCount = 0; //Tracks the number of buffer samples to take after the 0 point is reached
+int bufferSamples = 20; //Number of samples before and after thrust value goes above 0
 long startMillis = 0; //The number of seconds on the clock when we start recording
 long curTime = 0; //The time value coming from the Arduino
 float runTime = 0.0; //How many seconds have passed since we started acquiring
-float curVoltage; //The current voltage being returned by a sensor
+float curThrust; //The current thrust data value coming back from the Arduino
 float thrustTotal = 0.0; //Used to calculate the average thrust
-double tempTotal = 0.0; //Used to calculate the average temp
+float tempTotal = 0.0; //Used to calculate the average temp
 float average; //Temporary variable to hold calculated average
-double tempAverage; //Temporary variable to hold calculated temperature average
-double curTemp; //The current temperature as read by the thermocouple
-double prevTemp; //The previous temperature in case we get a corrupt value
-int[] thrustVals; //An array of the thrust values taken during testing
-int[] tempVals; //An array of the temperature values taken during testing
+float tempAverage; //Temporary variable to hold calculated temperature average
+float curTemp; //The current temperature as read by the thermocouple
+ArrayList thrustVals; //List of the thrust values taken during testing
+ArrayList tempVals; //List of the temperature values taken during testing
+ArrayList timeVals; //List of the time values taken during testing
 String serialPortText = "/dev/ttyACM0";
 String incomingData = ""; //The comma delimited list of values from the Arduino
-String[] incomingArray; //The breakdown of the incoming values over serial
 Serial serialPort; //Currently, we talk over the serial/USB cable to the Arduino
+PrintWriter csvFile; //The file that we'll save the test stand data to for each run 
 PFont defaultFont; //The default font for the app
 color c1; //Gradient color 1
 color c2; //Gradient color 2
@@ -69,6 +70,11 @@ Button clearButton; //The clears the charts, averages, maxes, etc
 /*Sets this app up for operation (window, serial, value storage, etc).*/
 void setup() 
 {
+  //Initialize the arrays that hold the measured values
+  thrustVals = new ArrayList();
+  tempVals = new ArrayList();
+  timeVals = new ArrayList();
+  
   //Set the size of the window
   size(800, 600);
   smooth();
@@ -277,13 +283,13 @@ void draw() {
     //Check to see if we have thrust data coming in
     if (dataID == 0xff) {
        //Read two bytes and combine them into the 0 to 1023 value
-       curThrust = (serialPort.read() << 8) | (serialPort.read());
+       curThrustRaw = (serialPort.read() << 8) | (serialPort.read());
        
        //Convert the value to it's voltage
-       curVoltage = round(scaleVolts(curThrust) * 1000.0) / 1000.0;
+       curThrust = round(scaleVolts(curThrustRaw) * 1000.0) / 1000.0;             
        
        //Make sure that the user wants to record before you add the data to the charts
-       if(recordButton.getBooleanValue() && curVoltage > 0.0) {
+       if(recordButton.getBooleanValue() && curThrust > 0.0) {
          //Check to see if we've been above zero yet and initialize our start time variable
          if(!aboveZero) {
            //Save the current number of seconds since the epoch
@@ -291,70 +297,83 @@ void draw() {
   
            //Make sure we don't enter this again
            aboveZero = true;
-         }
-         
+         }         
+
          //Add the current value to the line chart at the beginning     
-         thrustChart.addData(curVoltage);
+         thrustChart.addData(curThrust);         
+         
+         //Save this thrust value to be written to file later
+         thrustVals.add(curThrust);
          
          //Check to see if we should save a new peak thrust value
-         if(peakThrustSlide.getValue() < curVoltage) {
-           peakThrustSlide.setValue(curVoltage);
+         if(peakThrustSlide.getValue() < curThrust) {
+           peakThrustSlide.setValue(curThrust);
          }
          
          //Update the average thrust value         
-         thrustTotal = thrustTotal + curVoltage; //Update the total
+         thrustTotal = thrustTotal + curThrust; //Update the total
          average = thrustTotal / numSamples; //Calculate the average         
-         avgThrustSlide.setValue(average); //Set the average      
-         //numSamples++;
-       }
+          avgThrustSlide.setValue(average); //Set the average      
+          //numSamples++;
+      }
+      else if(recordButton.getBooleanValue() && curThrust == 0.0 && aboveZero) {
+        println("Writing File\n");
+        
+        //Filename is based on provided motor model and time stamp
+        csvFile = createWriter("data/" + txtMotorModel.getText() + "_" + hour() + "_" + minute() + "_" + second() + ".csv");
+        
+        //Step through the data and write it to the file in comma delimited format
+        for(int i = 0; i < thrustVals.size(); i++) {
+          csvFile.println(thrustVals.get(i) + "," + tempVals.get(i) + "," + timeVals.get(i));
+        }
+        
+        //Make sure all data is written to the file and close it
+        csvFile.flush();
+        csvFile.close();
+  
+        //Reset the flag that tracks whether or not we're above 0
+        aboveZero = false;
+      }
        
-       //Update the slider even if we're not recording
-       curThrustSlide.setValue(curVoltage);              
+      //Update the slider even if we're not recording
+      curThrustSlide.setValue(curThrust);              
     }
     //Check to see if we have temperature data coming in
     else if(dataID == 0xfe) {
       //Read the temp value from the serial port as a string
-      incomingData = serialPort.readString();
-      
-      //Sometimes we get corrupted data over the serial port
-      //because we're trying to get the sample data too fast.
-      try {
-        //Convert the string double value to a numic double      
-        curTemp = Double.parseDouble(incomingData);
-        
-        //Assume success and save this value as the previous value
-        prevTemp = curTemp;
-      }
-      catch(Exception e) {
-        //Place the previous temperature value in the place of our corrupted value
-        curTemp = prevTemp;
-      }
+      curTemp = ((serialPort.read() << 8) | (serialPort.read())) / 1000.0f;           
       
       //Make sure that the user wants to record before you add the data to the charts
-      if(recordButton.getBooleanValue() && curVoltage > 0.0) {
+      if(recordButton.getBooleanValue() && curThrust > 0.0) {
         //Add the current value to the line chart at the beginning     
-        tempChart.addData((float)curTemp);
-         
+        tempChart.addData(curTemp);
+        
+        //Save the temperature value so that it can be written to file later
+        tempVals.add(curTemp);
+        
         //Check to see if we should save a new peak thrust value
         if(maxTempSlide.getValue() < curTemp) {
-          maxTempSlide.setValue((float)curTemp);
+          maxTempSlide.setValue(curTemp);
         }
          
         //Update the average thrust value         
         tempTotal = tempTotal + curTemp; //Update the total
         tempAverage = tempTotal / numSamples; //Calculate the average         
-        avgTempSlide.setValue((float)tempAverage); //Set the average      
+        avgTempSlide.setValue(tempAverage); //Set the average      
         numSamples++;
       }
 
       //Set the current temp slider even if we're not recording
-      curTempSlide.setValue((float)curTemp);      
+      curTempSlide.setValue(curTemp);      
     }
     
     //Make sure that the user wants to record before you add the data to the charts
-    if(recordButton.getBooleanValue() && curVoltage > 0.0) {
+    if(recordButton.getBooleanValue() && curThrust > 0.0) {
       //Save the number of seconds since we started running  
       runTime = millisElapsed(startMillis) / 1000.0f;
+      
+      //Save the current time value
+      timeVals.add(runTime);
     }
     
     //Reading the time stamp from the Arduino over serial ended up being too problemmatic.
@@ -533,9 +552,14 @@ public void Clear(int theValue) {
   startMillis = 0;
   aboveZero = false;
   
-  //Clear the charts and reset their values
-  thrustChart.getDataSet("curthrust").clear();
-  tempChart.getDataSet("curtemp").clear();
+  //Reset the lists that hold data to write to file
+  thrustVals.clear();
+  tempVals.clear();
+  timeVals.clear();
+  
+  //Clear the charts and reset their values  
+  thrustChart.setData("curthrust", new float[10]);
+  tempChart.setData("curtemp", new float[10]);
   
   //Reset the sliders  
   peakThrustSlide.setValue(0.0);
