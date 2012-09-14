@@ -62,7 +62,8 @@ void loop() {
   
   //Send the temperature value to the Processing app
   Serial.write(0xfe); //ID/control byte so Processing can distinguish sensors
-  Serial.print(tempValue);
+  Serial.write((round(tempValue * 1000.0f) >> 8) & 0xff);
+  Serial.write(round(tempValue * 1000.0f) & 0xff);
   
   //The following is handled on the PC side of things because trying to 
   //ship this value over serial in a reliable manner proved to be too much trouble.
@@ -74,5 +75,5 @@ void loop() {
 
   //There should be a fairly large delay here, but we're going to
   //deal with some errors in order to get a faster sample rate.
-  delay(2);
+  delay(1);
 }
