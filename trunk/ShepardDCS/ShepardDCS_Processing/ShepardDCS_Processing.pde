@@ -286,7 +286,16 @@ void draw() {
        curThrustRaw = (serialPort.read() << 8) | (serialPort.read());
        
        //Convert the value to it's voltage
-       curThrust = round(scaleVolts(curThrustRaw) * 1000.0) / 1000.0;             
+       //curThrust = round(scaleVolts(curThrustRaw) * 1000.0) / 1000.0;             
+       
+       //If the raw thrust value is 0, don't display 0.17...
+       if(curThrustRaw == 0) {
+         curThrust = 0.0;
+       }
+       else {
+         //Convert the thrust to Newtons so that the value matches the Estes documentation
+         curThrust = 0.0160651931 * curThrustRaw + 0.1727283196;
+       }
        
        //Make sure that the user wants to record before you add the data to the charts
        if(recordButton.getBooleanValue() && curThrust > 0.0) {
