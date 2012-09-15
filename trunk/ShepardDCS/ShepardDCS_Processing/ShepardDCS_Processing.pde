@@ -43,10 +43,11 @@ float tempTotal = 0.0; //Used to calculate the average temp
 float average; //Temporary variable to hold calculated average
 float tempAverage; //Temporary variable to hold calculated temperature average
 float curTemp; //The current temperature as read by the thermocouple
+float triggerThrust = 0.33;
 ArrayList thrustVals; //List of the thrust values taken during testing
 ArrayList tempVals; //List of the temperature values taken during testing
 ArrayList timeVals; //List of the time values taken during testing
-String serialPortText = "/dev/ttyACM0";
+String serialPortText = "COM5";
 String incomingData = ""; //The comma delimited list of values from the Arduino
 Serial serialPort; //Currently, we talk over the serial/USB cable to the Arduino
 PrintWriter csvFile; //The file that we'll save the test stand data to for each run 
@@ -298,7 +299,7 @@ void draw() {
        }
        
        //Make sure that the user wants to record before you add the data to the charts
-       if(recordButton.getBooleanValue() && curThrust > 0.0) {
+       if(recordButton.getBooleanValue() && curThrust > triggerThrust) {
          //Check to see if we've been above zero yet and initialize our start time variable
          if(!aboveZero) {
            //Save the current number of seconds since the epoch
@@ -353,7 +354,7 @@ void draw() {
       curTemp = ((serialPort.read() << 8) | (serialPort.read())) / 1000.0f;           
       
       //Make sure that the user wants to record before you add the data to the charts
-      if(recordButton.getBooleanValue() && curThrust > 0.0) {
+      if(recordButton.getBooleanValue() && curThrust > triggerThrust) {
         //Add the current value to the line chart at the beginning     
         tempChart.addData(curTemp);
         
@@ -377,7 +378,7 @@ void draw() {
     }
     
     //Make sure that the user wants to record before you add the data to the charts
-    if(recordButton.getBooleanValue() && curThrust > 0.0) {
+    if(recordButton.getBooleanValue() && curThrust > triggerThrust) {
       //Save the number of seconds since we started running  
       runTime = millisElapsed(startMillis) / 1000.0f;
       
