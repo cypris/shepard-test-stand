@@ -47,7 +47,7 @@ float triggerThrust = 0.33;
 ArrayList thrustVals; //List of the thrust values taken during testing
 ArrayList tempVals; //List of the temperature values taken during testing
 ArrayList timeVals; //List of the time values taken during testing
-String serialPortText = "COM5";
+String serialPortText = "COM5"; //Holds the COM port that the Arduino is attached to
 String incomingData = ""; //The comma delimited list of values from the Arduino
 Serial serialPort; //Currently, we talk over the serial/USB cable to the Arduino
 PrintWriter csvFile; //The file that we'll save the test stand data to for each run 
@@ -326,7 +326,7 @@ void draw() {
           avgThrustSlide.setValue(average); //Set the average      
           //numSamples++;
       }
-      else if(recordButton.getBooleanValue() && curThrust == 0.0 && aboveZero) {
+      else if(!recordButton.getBooleanValue() && aboveZero) {
         println("Writing File\n");
         
         //Filename is based on provided motor model and time stamp
