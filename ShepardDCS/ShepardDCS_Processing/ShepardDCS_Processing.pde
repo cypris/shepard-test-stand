@@ -48,10 +48,6 @@ float triggerThrust = 0.33;
 ArrayList thrustVals; //List of the thrust values taken during testing
 ArrayList tempVals; //List of the temperature values taken during testing
 ArrayList timeVals; //List of the time values taken during testing
-//String serialPortText = "COM5"; //Holds the COM port that the Arduino is attached to
-//String serialPortText = "" + Serial.list().length;
-//String serialPortText = "" + Serial.list()[0]; //Holds the COM port that the Arduino is attached to
-//String serialPortText = "/dev/ttyACM0";
 String incomingData = ""; //The comma delimited list of values from the Arduino
 Serial serialPort; //Currently, we talk over the serial/USB cable to the Arduino
 PrintWriter csvFile; //The file that we'll save the test stand data to for each run 
@@ -99,7 +95,7 @@ void setup()
   //Set a general label for the app's upper left corner
   cp5.addTextlabel("label")
     .setText("Shepard Test Stand")
-    .setPosition(10,15)
+    .setPosition(5,15)
     .setColorValue(0xffffffff)
     .setFont(createFont("arial",18));
   
@@ -111,13 +107,20 @@ void setup()
     .setFont(createFont("arial", 9));        
      
   //Sets the file name prefix to be the motor model number
-  txtMotorModel= cp5.addTextfield("Motor Model")
+  txtMotorModel= cp5.addTextfield("")
      .setPosition(320,20)
      .setSize(100,20)
      .setFont(defaultFont)
      .setColor(0xffffffff)
      .setAutoClear(false)
      .registerTooltip("This is prepended to the beginning of the CSV file name");
+     
+  //Set a label for the drop down menu
+  cp5.addTextlabel("label2")
+    .setText("MOTOR MODEL")
+    .setPosition(315,8)
+    .setColorValue(0xffffffff)
+    .setFont(createFont("arial", 9));
      
   //Align the caption text
   txtMotorModel.getCaptionLabel().align(ControlP5.LEFT, ControlP5.TOP_OUTSIDE).setPaddingX(0).setPaddingY(0);
