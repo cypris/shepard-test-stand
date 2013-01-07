@@ -34,6 +34,7 @@ int Y_AXIS = 2; //Specifier for a Y-axis gradient
 int numOfTicks = 1; //The number of ticks that will be drawn on the X axis
 int bufferCount = 0; //Tracks the number of buffer samples to take after the 0 point is reached
 int bufferSamples = 20; //Number of samples before and after thrust value goes above 0
+int cnt = 0; //The item count for the dropdown list 
 long startMillis = 0; //The number of seconds on the clock when we start recording
 long curTime = 0; //The time value coming from the Arduino
 float runTime = 0.0; //How many seconds have passed since we started acquiring
@@ -47,7 +48,10 @@ float triggerThrust = 0.33;
 ArrayList thrustVals; //List of the thrust values taken during testing
 ArrayList tempVals; //List of the temperature values taken during testing
 ArrayList timeVals; //List of the time values taken during testing
-String serialPortText = "COM5"; //Holds the COM port that the Arduino is attached to
+//String serialPortText = "COM5"; //Holds the COM port that the Arduino is attached to
+//String serialPortText = "" + Serial.list().length;
+//String serialPortText = "" + Serial.list()[0]; //Holds the COM port that the Arduino is attached to
+//String serialPortText = "/dev/ttyACM0";
 String incomingData = ""; //The comma delimited list of values from the Arduino
 Serial serialPort; //Currently, we talk over the serial/USB cable to the Arduino
 PrintWriter csvFile; //The file that we'll save the test stand data to for each run 
@@ -67,6 +71,8 @@ Slider maxTempSlide; //The slider that will show the current thrust value
 Slider avgTempSlide; //The slider that will show the current thrust value
 Button recordButton; //The button that controls whether or not data will be recorded
 Button clearButton; //The clears the charts, averages, maxes, etc
+DropdownList ddl1; //The drop down list holding the serial ports 
+String[] serialPorts = Serial.list();//new String[Serial.list().length]; //The serial ports that are available on the system
 
 /*Sets this app up for operation (window, serial, value storage, etc).*/
 void setup() 
@@ -95,20 +101,14 @@ void setup()
     .setText("Shepard Test Stand")
     .setPosition(10,15)
     .setColorValue(0xffffffff)
-    .setFont(createFont("arial",18));  
-    
-  //Allows us to set the serial port the Arduino is on
-  txtSerialPort = cp5.addTextfield("Serial Port")
-     .setPosition(200,20)
-     .setSize(100,20)
-     .setFont(defaultFont)
-     .setColor(0xffffffff)
-     .setAutoClear(false)
-     .setValue(serialPortText)
-     .registerTooltip("The serial port that the Arduino is communicating on");
-     
-  //Align the caption text
-  txtSerialPort.getCaptionLabel().align(ControlP5.LEFT, ControlP5.TOP_OUTSIDE).setPaddingX(0).setPaddingY(0);         
+    .setFont(createFont("arial",18));
+  
+  //Set a label for the drop down menu
+  cp5.addTextlabel("label1")
+    .setText("SERIAL PORT")
+    .setPosition(195,8)
+    .setColorValue(0xffffffff)
+    .setFont(createFont("arial", 9));        
      
   //Sets the file name prefix to be the motor model number
   txtMotorModel= cp5.addTextfield("Motor Model")
@@ -251,9 +251,20 @@ void setup()
   maxTempSlide.getValueLabel().align(ControlP5.LEFT, ControlP5.TOP_OUTSIDE).setPaddingX(0);
   avgTempSlide.getValueLabel().align(ControlP5.LEFT, ControlP5.TOP_OUTSIDE).setPaddingX(0);
   
-  //The serial port that the Arduino is connected to
-  serialPort = new Serial(this, serialPortText, 115200);
+  //Create and add the dropdown list
+  ddl1 = cp5.addDropdownList(Serial.list()[0], 200, 40, 100, 40);
+  ddl1.setItemHeight(18);
+  ddl1.setBarHeight(18);
+  ddl1.captionLabel().style().marginTop = 5;
   
+  //Step through and add all of the serial ports to the dropdown list
+  for(int i = 0; i < serialPorts.length; i++) {
+    ddl1.addItem(serialPorts[i], i);
+  }
+  
+  //The serial port that the Arduino is connected to
+  serialPort = new Serial(this, Serial.list()[0], 115200);
+
   textFont(defaultFont);  
 }
 
@@ -323,7 +334,7 @@ void draw() {
          //Update the average thrust value         
          thrustTotal = thrustTotal + curThrust; //Update the total
          average = thrustTotal / numSamples; //Calculate the average         
-          avgThrustSlide.setValue(average); //Set the average      
+         avgThrustSlide.setValue(average); //Set the average      
           //numSamples++;
       }
       else if(!recordButton.getBooleanValue() && aboveZero) {
@@ -537,19 +548,14 @@ void setGradient(int x, int y, float w, float h, color c1, color c2, int axis ) 
   }
 }
 
-/*Called when */
+/*Called when the dropdown list is changed*/
 void controlEvent(ControlEvent theEvent) {
-  if(theEvent.isAssignableFrom(Textfield.class)) {
-    println("controlEvent: accessing a string from controller '"
-            +theEvent.getName()+"': "
-            +theEvent.getStringValue()
-            );
-            
-    //Save the new serial port value
-    serialPortText = theEvent.getStringValue();
+  if (theEvent.isGroup()) {
+    //Stop the serial port so that it can be reset
+    serialPort.stop();
     
     //Set the Arduino serial port to the new value
-    serialPort = new Serial(this, serialPortText, 115200);
+    serialPort = new Serial(this, serialPorts[int(theEvent.group().value())], 115200);
   }
 }
 
