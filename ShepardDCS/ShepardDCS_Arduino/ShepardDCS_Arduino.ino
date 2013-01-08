@@ -50,9 +50,12 @@ void setup() {
 void loop() {
   //Read the current value from the FSR (thrust sensor)
   thrustValue = analogRead(thrustPin);
+  
   //Read the current value from the thermocouple
   tempValue = thermocouple.readCelsius();
+  
   //Read the current time value in milliseconds
+  //TODO: Implement this once the sample speed is high enough on the thermocouple
   timeValue = millis();
 
   //Send the thrust value to the Processing app
@@ -65,13 +68,10 @@ void loop() {
   Serial.write((round(tempValue * 1000.0f) >> 8) & 0xff);
   Serial.write(round(tempValue * 1000.0f) & 0xff);
   
-  //The following is handled on the PC side of things because trying to 
-  //ship this value over serial in a reliable manner proved to be too much trouble.
-  //This time stamp really should be provided by the Arduino and not the Processing
-  //app though.
-  //Send the time value to the Processing app
-  /*Serial.write(0xfd); //ID/control byte so Processing can distinguish sensors
-  Serial.print(timeValue);*/
+  //Send the time stamp to the Processing app
+  Serial.write(0xfd); //ID/control byte so Processing can distinguish sensors
+  Serial.write((timeValue >> 8) & 0xff);
+  Serial.write(timeValue & 0xff);  
 
   //There should be a fairly large delay here, but we're going to
   //deal with some errors in order to get a faster sample rate.

@@ -317,7 +317,8 @@ void draw() {
          //Check to see if we've been above zero yet and initialize our start time variable
          if(!aboveZero) {
            //Save the current number of seconds since the epoch
-           startMillis = millis();
+           //startMillis = millis();
+           startMillis = curTime;       
   
            //Make sure we don't enter this again
            aboveZero = true;
@@ -344,11 +345,15 @@ void draw() {
         println("Writing File\n");
         
         //Filename is based on provided motor model and time stamp
-        csvFile = createWriter("data/" + txtMotorModel.getText() + "_" + hour() + "_" + minute() + "_" + second() + ".csv");
+        csvFile = createWriter("data/" + txtMotorModel.getText() + "_" + year() + "_" + month() + "_" + day() + "_" + hour() + "_" + minute() + "_" + second() + ".csv");
+        
+        //Write a header for the data to the file
+        csvFile.println("Time (sec),Thrust (N),Temperature (°C)");
         
         //Step through the data and write it to the file in comma delimited format
         for(int i = 0; i < thrustVals.size(); i++) {
-          csvFile.println(thrustVals.get(i) + "," + tempVals.get(i) + "," + timeVals.get(i));
+          //Add the current data record to the CSV file          
+          csvFile.println(timeVals.get(i) + "," + thrustVals.get(i) + "," + tempVals.get(i));
         }
         
         //Make sure all data is written to the file and close it
@@ -384,54 +389,26 @@ void draw() {
         tempTotal = tempTotal + curTemp; //Update the total
         tempAverage = tempTotal / numSamples; //Calculate the average         
         avgTempSlide.setValue(tempAverage); //Set the average      
-        numSamples++;
+        numSamples++;      
       }
 
       //Set the current temp slider even if we're not recording
       curTempSlide.setValue(curTemp);      
     }
-    
-    //Make sure that the user wants to record before you add the data to the charts
-    if(recordButton.getBooleanValue() && curThrust > triggerThrust) {
-      //Save the number of seconds since we started running  
-      runTime = millisElapsed(startMillis) / 1000.0f;
+    //Check to see if we have temperature data coming in
+    else if(dataID == 0xfd) {
+      //Read the time stamp from the serial port as a string
+      curTime = ((serialPort.read() << 8) | (serialPort.read()));
       
-      //Save the current time value
-      timeVals.add(runTime);
-    }
-    
-    //Reading the time stamp from the Arduino over serial ended up being too problemmatic.
-    //Times weren't updating properly, some time stamps were getting corrupted due to serial
-    //errors, etc.
-    //Check to see if we have time data coming in
-    /*else if(dataID == 0xfd) {
-      //Read the temp value from the serial port as a string
-      incomingData = serialPort.readString();
-      
-      //Sometimes we get corrupted data over the serial port
-      //because we're trying to get the sample data too fast.
-      try {
-        //Make sure that the user wants to record before you add the data to the charts
-        if(recordButton.getBooleanValue() && curVoltage > 0.0) {
-          //Check to see if this is the first time value we've gotten
-          if(startMillis == 0) {
-            //Convert the string double value to a numic double      
-            startMillis = Long.parseLong(incomingData);          
-          }
-          else {
-            //Parse the millis so that we can calculate a runtime
-            curTime = Long.parseLong(incomingData);
-            
-            //Update the run time
-            runTime = (curTime - startMillis) / 1000.0f;                   
-          }
-        }
+      //Make sure that the user wants to record before you add the data to the charts
+      if(recordButton.getBooleanValue() && curThrust > triggerThrust) {            
+        //Update the run time
+        runTime = (curTime - startMillis) / 1000.0f;                   
+          
+        //Save the current time value
+        timeVals.add(runTime);
       }
-      catch(Exception e) {
-        //Place the previous temperature value in the place of our corrupted value
-        println("Problem with time");
-      }
-    }*/
+    }        
   }
 }
 
