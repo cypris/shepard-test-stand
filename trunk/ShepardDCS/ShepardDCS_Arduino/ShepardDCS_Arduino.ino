@@ -55,7 +55,6 @@ void loop() {
   tempValue = thermocouple.readCelsius();
   
   //Read the current time value in milliseconds
-  //TODO: Implement this once the sample speed is high enough on the thermocouple
   timeValue = millis();
 
   //Send the thrust value to the Processing app
