@@ -80,6 +80,13 @@ void setup()
   
   //Set the size of the window
   size(800, 600);
+  
+  //TODO: Need to figure out how to make the ControlP5 elements scale to the screen. This will probably require custom coding.
+  //Make sure the user can resize the window
+  /*if (frame != null) {
+    frame.setResizable(true);
+  }*/
+  
   smooth();
   
   //The font that our GUI will use
