@@ -61,18 +61,18 @@ void loop() {
   Serial.write(0xff); //ID/control byte so Processing can distinguish sensors
   Serial.write((thrustValue >> 8) & 0xff); //The first byte
   Serial.write(thrustValue & 0xff); //The second byte
-  
+    
   //Send the temperature value to the Processing app
   Serial.write(0xfe); //ID/control byte so Processing can distinguish sensors
   Serial.write((round(tempValue * 1000.0f) >> 8) & 0xff);
   Serial.write(round(tempValue * 1000.0f) & 0xff);
-  
+    
   //Send the time stamp to the Processing app
   Serial.write(0xfd); //ID/control byte so Processing can distinguish sensors
   Serial.write((timeValue >> 8) & 0xff);
   Serial.write(timeValue & 0xff);  
-
+  
   //There should be a fairly large delay here, but we're going to
   //deal with some errors in order to get a faster sample rate.
-  delay(1);
+  delay(2);
 }

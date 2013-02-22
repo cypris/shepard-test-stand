@@ -1,4 +1,4 @@
-/* Copyright (C) 2012 Mach 30 - http://www.mach30.org 
+/* Copyright (C) 2012-2013 Mach 30 - http://www.mach30.org 
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -144,7 +144,7 @@ void setup()
   //Align the caption text to the center of the button
   recordButton.getCaptionLabel().alignX(ControlP5.CENTER); 
 
-  //Button to allow/disallow data recording
+  //Button to clear the data
   clearButton = cp5.addButton("Clear")
      .setPosition(560, 20)
      .setSize(100, 20)
