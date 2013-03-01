@@ -248,9 +248,16 @@ class M30Chart {
         }
         
         //Draw the current calibration point's circle scaling the position in pixels to the position in values
-        //ellipse((pen1Points[0][i] / xMax) * (xPos - elemWidth - 10), (pen1Points[1][i] / yMax) * (yPos + elemHeight - axisOffset), 5, 5);
-        //ellipse(x, y, 5, 5);
-      }
-      //TODO: Draw lines, points, and scale here 
+        ellipse(((xPos + elemWidth - 20) - (xPos + axisOffset)) * (pen1Points[0][i] / xMax) + (xPos + axisOffset), (yPos + elemHeight - axisOffset) - (pen1Points[1][i] / yMax) * ((yPos + (elemHeight - axisOffset)) - (yPos + 10)), 5, 5);
+
+        //Check to see if we need to start drawing lines
+        if(i >= 1) {
+          //Draw the lines between the points
+          line(((xPos + elemWidth - 20) - (xPos + axisOffset)) * (pen1Points[0][i] / xMax) + (xPos + axisOffset), 
+              (yPos + elemHeight - axisOffset) - (pen1Points[1][i] / yMax) * ((yPos + (elemHeight - axisOffset)) - (yPos + 10)),
+              ((xPos + elemWidth - 20) - (xPos + axisOffset)) * (pen1Points[0][i - 1] / xMax) + (xPos + axisOffset), 
+              (yPos + elemHeight - axisOffset) - (pen1Points[1][i - 1] / yMax) * ((yPos + (elemHeight - axisOffset)) - (yPos + 10)));  
+        }        
+      }            
     }
 }
