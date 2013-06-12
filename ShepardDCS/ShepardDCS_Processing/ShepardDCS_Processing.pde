@@ -316,7 +316,9 @@ void draw() {
        }
        else {
          //Convert the thrust to Newtons so that the value matches the Estes documentation
-         curThrust = 0.0160651931 * curThrustRaw + 0.1727283196;
+         //curThrust = 0.0160651931 * curThrustRaw + 0.1727283196;
+         curThrust = 0.0079036704 * curThrustRaw - 0.3970384711; //Gives us the thrust in English pounds
+         curThrust = curThrust * 4.448; //Gives us the thrust in Newtons
        }
        
        //Make sure that the user wants to record before you add the data to the charts
@@ -377,7 +379,7 @@ void draw() {
     //Check to see if we have temperature data coming in
     else if(dataID == 0xfe) {
       //Read the temp value from the serial port as a string
-      curTemp = ((serialPort.read() << 8) | (serialPort.read())) / 1000.0f;           
+      curTemp = ((serialPort.read() << 8) | (serialPort.read())) / 1000.0f;
       
       //Make sure that the user wants to record before you add the data to the charts
       if(recordButton.getBooleanValue() && curThrust > triggerThrust) {

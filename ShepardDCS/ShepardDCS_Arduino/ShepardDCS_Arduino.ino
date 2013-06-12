@@ -52,7 +52,8 @@ void loop() {
   thrustValue = analogRead(thrustPin);
   
   //Read the current value from the thermocouple
-  tempValue = thermocouple.readCelsius();
+  //tempValue = thermocouple.readCelsius();
+  tempValue = 0.0;
   
   //Read the current time value in milliseconds
   timeValue = millis();
