@@ -44,7 +44,7 @@ float tempTotal = 0.0; //Used to calculate the average temp
 float average; //Temporary variable to hold calculated average
 float tempAverage; //Temporary variable to hold calculated temperature average
 float curTemp; //The current temperature as read by the thermocouple
-float triggerThrust = 0.33;
+float triggerThrust = 0.01;
 ArrayList thrustVals; //List of the thrust values taken during testing
 ArrayList tempVals; //List of the temperature values taken during testing
 ArrayList timeVals; //List of the time values taken during testing
@@ -379,7 +379,7 @@ void draw() {
     //Check to see if we have temperature data coming in
     else if(dataID == 0xfe) {
       //Read the temp value from the serial port as a string
-      curTemp = ((serialPort.read() << 8) | (serialPort.read())) / 1000.0f;
+      curTemp = ((serialPort.read() << 8) | (serialPort.read())) / 100.0f;
       
       //Make sure that the user wants to record before you add the data to the charts
       if(recordButton.getBooleanValue() && curThrust > triggerThrust) {
