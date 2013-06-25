@@ -20,22 +20,28 @@
  * temperature at the throat of the motor.
  */
  
-#include "Adafruit_MAX31855.h"
+//#include "Adafruit_MAX31855.h"
+#include "Mach30_I2C.h"
  
 int thrustPin = A0; //A0 is the input pin for FSR (thrust measurement)
 int thrustValue = 0; //The value 0-1023 from the FSR's analog pin
-double tempValue = 0.0; //The value (in Celsius) of the thermocouple
+//double tempValue = 0.0; //The value (in Celsius) of the thermocouple
+int tempValue = 0; //The value (in sans-decimal point Celsius) of the MLX temperature sensor
 unsigned long timeValue = 0; //The timestamp in milliseconds since the program started
 int thermoDO = 3; //The "Data Out" digital pin
 int thermoCS = 4; //The "Chip Select" digital pin
 int thermoCLK = 5; //The "Clock" digital pin
 int ledPin = 13; //The LED pin is used in serial comms
+Mach30_I2C mlxTempProbe; //Represents the Mach 30 library for reading from the MLX90614 via I2C
 
 //Set the Adafruit breakout board up for use
-Adafruit_MAX31855 thermocouple(thermoCLK, thermoCS, thermoDO);
+//Adafruit_MAX31855 thermocouple(thermoCLK, thermoCS, thermoDO);
 
 /*Sets the sketch up for use*/
 void setup() {
+  //Initialize the MLX9061
+  mlxTempProbe.i2c_init();
+
   //Set up serial comms
   Serial.begin(115200);
   
@@ -52,8 +58,9 @@ void loop() {
   thrustValue = analogRead(thrustPin);
   
   //Read the current value from the thermocouple
+  tempValue = mlxTempProbe.get_celcius_temp(OBJECT_TEMP);
   //tempValue = thermocouple.readCelsius();
-  tempValue = 0.0;
+  //tempValue = 0.0;
   
   //Read the current time value in milliseconds
   timeValue = millis();
@@ -65,8 +72,10 @@ void loop() {
     
   //Send the temperature value to the Processing app
   Serial.write(0xfe); //ID/control byte so Processing can distinguish sensors
-  Serial.write((round(tempValue * 1000.0f) >> 8) & 0xff);
-  Serial.write(round(tempValue * 1000.0f) & 0xff);
+  /*Serial.write((round(tempValue * 1000.0f) >> 8) & 0xff);
+  Serial.write(round(tempValue * 1000.0f) & 0xff);*/
+  Serial.write((tempValue >> 8) & 0xff);
+  Serial.write(tempValue & 0xff);
     
   //Send the time stamp to the Processing app
   Serial.write(0xfd); //ID/control byte so Processing can distinguish sensors
