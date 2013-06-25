@@ -24,8 +24,10 @@ import processing.serial.*; //The serial port configuration
 import controlP5.*; //Our graphics library
 
 //Global variables
+boolean isReady = false; //Whether or not we're ready to receive data
 boolean isRecording = false; //Tracks whether or not the user wants to record
 boolean aboveZero = false; //Tracks whether or not the voltage has gone above zero
+char clientReady = 'R'; //The byte that tells the Arduino we're ready to start receiving data
 int dataID; //The ID used to separate between types of data coming from the Arduino
 int curThrustRaw; //The current thrust data value in 0 to 1023 format
 int numSamples = 1; //The number of samples taken so far
@@ -44,7 +46,7 @@ float tempTotal = 0.0; //Used to calculate the average temp
 float average; //Temporary variable to hold calculated average
 float tempAverage; //Temporary variable to hold calculated temperature average
 float curTemp; //The current temperature as read by the thermocouple
-float triggerThrust = 0.01;
+float triggerThrust = 0.01; //The thrust level that will tell the software to start recording data.
 ArrayList thrustVals; //List of the thrust values taken during testing
 ArrayList tempVals; //List of the temperature values taken during testing
 ArrayList timeVals; //List of the time values taken during testing
@@ -273,9 +275,15 @@ void setup()
   }
   
   //The serial port that the Arduino is connected to
-  serialPort = new Serial(this, Serial.list()[0], 115200);
-
-  textFont(defaultFont);  
+  serialPort = new Serial(this, Serial.list()[0], 115200);  
+  
+  //Find a better way to do this than waiting
+  //delay(2000);
+  
+  //Tell the Arduino we're ready
+  //serialPort.write(clientReady);    
+  
+  textFont(defaultFont);
 }
 
 /*Draws the GUI and all its components for us*/
@@ -295,10 +303,23 @@ void draw() {
   }
   else {
       recordButton.getCaptionLabel().setText("Enable Recording");                  
+  }   
+    
+  //If we haven't started receiving yet, ask the Arduino for data
+  //We have to keep trying until the serial port is up and running
+  while (serialPort.available() == 0 && !isReady) {
+      //Tell the Arduino we're ready
+      serialPort.write(clientReady);  
+  
+      //Take a short break
+      delay(100);    
   }
   
   //As long as we're getting data keep looping and reading from the port
   while (serialPort.available() >= 3) {
+    //Make sure we don't keep asking for the Arduino to start sending data
+    isReady = true;
+    
     //Figure out what type of data is coming back (from first byte)
     dataID = serialPort.read(); 
     
