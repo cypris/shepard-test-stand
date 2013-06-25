@@ -1,4 +1,4 @@
-/* Copyright (C) 2012 Mach 30 - http://www.mach30.org 
+/* Copyright (C) 2012-2013 Mach 30 - http://www.mach30.org 
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,32 +15,28 @@
 
 /*
  * This Data Collection Software (DCS) takes readings from 2 input sensors.
- * The first is a force sensor that measures the trust of the rocket motor
- * under test. The second is a thermocouple which measures the casing 
- * temperature at the throat of the motor.
+ * The first is a force sensor (load cell) that measures the trust of the rocket motor
+ * under test. The second is a non-contact IR temperature sensor which measures the casing 
+ * temperature at the throat of the motor. The temperature sensor uses I2C for its
+ * interface and thus requires the Mach30_I2C library.
  */
- 
-//#include "Adafruit_MAX31855.h"
+
 #include "Mach30_I2C.h"
  
-int thrustPin = A0; //A0 is the input pin for FSR (thrust measurement)
-int thrustValue = 0; //The value 0-1023 from the FSR's analog pin
-//double tempValue = 0.0; //The value (in Celsius) of the thermocouple
-int tempValue = 0; //The value (in sans-decimal point Celsius) of the MLX temperature sensor
+char incomingByte; //The byte being read to tell us whether or not a client is connected
+char isClientConnected = 0; //Whether or not a client is read to receive data from the Arduino
+char clientReady = 'R'; //The character that tells us whether or not the client is ready to recieve
+int thrustPin = A0; //A0 is the input pin for load cell (thrust measurement)
+int thrustValue = 0; //The value 0-1023 from the load cell's analog pin
+int tempValue = 0; //The object temperature (in sans-decimal point Celsius format) of the I2C temperature sensor
 unsigned long timeValue = 0; //The timestamp in milliseconds since the program started
-int thermoDO = 3; //The "Data Out" digital pin
-int thermoCS = 4; //The "Chip Select" digital pin
-int thermoCLK = 5; //The "Clock" digital pin
 int ledPin = 13; //The LED pin is used in serial comms
-Mach30_I2C mlxTempProbe; //Represents the Mach 30 library for reading from the MLX90614 via I2C
-
-//Set the Adafruit breakout board up for use
-//Adafruit_MAX31855 thermocouple(thermoCLK, thermoCS, thermoDO);
+Mach30_I2C i2cInterface; //Represents the Mach 30 library for reading from the MLX90614 via I2C
 
 /*Sets the sketch up for use*/
 void setup() {
-  //Initialize the MLX9061
-  mlxTempProbe.i2c_init();
+  //Initialize the MLX90614 sensor
+  i2cInterface.i2c_init();
 
   //Set up serial comms
   Serial.begin(115200);
@@ -48,41 +44,55 @@ void setup() {
   //Use the LED pin as an output pin
   pinMode(ledPin, OUTPUT);
   
-  //Wait for the MAX31855 chip to stabilize
+  //Wait for things to complete before moving on
   delay(500);
 }
 
 /*Step through continuously reading the sensor values*/
 void loop() {
-  //Read the current value from the FSR (thrust sensor)
-  thrustValue = analogRead(thrustPin);
-  
-  //Read the current value from the thermocouple
-  tempValue = mlxTempProbe.get_celcius_temp(OBJECT_TEMP);
-  //tempValue = thermocouple.readCelsius();
-  //tempValue = 0.0;
-  
-  //Read the current time value in milliseconds
-  timeValue = millis();
+  //If a client hasn't connected, we need to see if one wants to
+  if (Serial.available() > 0 && !isClientConnected) {    
+    //Check to see if a client is ready to receive data
+    incomingByte = Serial.read();    
 
-  //Send the thrust value to the Processing app
-  Serial.write(0xff); //ID/control byte so Processing can distinguish sensors
-  Serial.write((thrustValue >> 8) & 0xff); //The first byte
-  Serial.write(thrustValue & 0xff); //The second byte
-    
-  //Send the temperature value to the Processing app
-  Serial.write(0xfe); //ID/control byte so Processing can distinguish sensors
-  /*Serial.write((round(tempValue * 1000.0f) >> 8) & 0xff);
-  Serial.write(round(tempValue * 1000.0f) & 0xff);*/
-  Serial.write((tempValue >> 8) & 0xff);
-  Serial.write(tempValue & 0xff);
-    
-  //Send the time stamp to the Processing app
-  Serial.write(0xfd); //ID/control byte so Processing can distinguish sensors
-  Serial.write((timeValue >> 8) & 0xff);
-  Serial.write(timeValue & 0xff);  
+    //Check to see if were told the client is ready
+    if ((char)incomingByte == clientReady) {
+      //Let the rest of the code know that there's a client connected and ready to receive data
+      isClientConnected = 1;
+    }  
+    else {
+      delay(25);
+    }    
+  }
   
-  //There should be a fairly large delay here, but we're going to
-  //deal with some errors in order to get a faster sample rate.
-  delay(2);
+  //Make sure that we're supposed to be transmitting data
+  if (isClientConnected) {
+    //Read the current value from the load cell (thrust sensor)
+    thrustValue = analogRead(thrustPin);
+    
+    //Read the current value from the I2C temperature sensor
+    tempValue = i2cInterface.get_celcius_temp(OBJECT_TEMP);
+    
+    //Read the current time value in milliseconds
+    timeValue = millis();
+  
+    //Send the thrust value to the Processing app
+    Serial.write(0xff); //ID/control byte so Processing can distinguish sensors
+    Serial.write((thrustValue >> 8) & 0xff); //The first byte
+    Serial.write(thrustValue & 0xff); //The second byte
+      
+    //Send the temperature value to the Processing app
+    Serial.write(0xfe); //ID/control byte so Processing can distinguish sensors    
+    Serial.write((tempValue >> 8) & 0xff); //First byte
+    Serial.write(tempValue & 0xff); //Second byte
+      
+    //Send the time stamp to the Processing app
+    Serial.write(0xfd); //ID/control byte so Processing can distinguish sensors
+    Serial.write((timeValue >> 8) & 0xff); //First byte
+    Serial.write(timeValue & 0xff); //Second byte
+    
+    //There should be a fairly large delay here, but we're going to
+    //deal with some errors in order to get a faster sample rate.
+    //delay(2);
+  }
 }
