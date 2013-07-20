@@ -27,7 +27,9 @@
 import processing.serial.*; //The serial port configuration
 import controlP5.*; //Our graphics library
 
+boolean isReady = false; //Whether or not we're ready to receive data
 boolean serialAvail = false; //Tracks whether or not we have any serial ports
+char clientReady = 'R'; //The byte that tells the Arduino we're ready to start receiving data
 int X_AXIS = 1; //Specifier for an X-axis gradient
 int Y_AXIS = 2; //Specifier for a Y-axis gradient
 int dataID; //The ID used to separate between types of data coming from the Arduino
@@ -192,10 +194,23 @@ void draw() {
   txtCalibPoints.draw();
   chrtCalibPoints.draw();
   
+  //If we haven't started receiving yet, ask the Arduino for data
+  //We have to keep trying until the serial port is up and running
+  while (serialPort.available() == 0 && !isReady) {
+      //Tell the Arduino we're ready
+      serialPort.write(clientReady);  
+  
+      //Take a short break
+      delay(100);    
+  }
+  
   //Make sure that we have a serial port available
   if(serialAvail) {
     //As long as we're getting data keep looping and reading from the port
     while (serialPort.available() >= 3) {
+      //Make sure we don't keep asking for the Arduino to start sending data
+      isReady = true;
+    
       //Figure out what type of data is coming back (from first byte) 0xff = thrust, 0xfe = temp, 0xfd = time
       dataID = serialPort.read();
       
