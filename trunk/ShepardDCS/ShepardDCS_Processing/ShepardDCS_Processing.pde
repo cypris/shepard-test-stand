@@ -338,7 +338,8 @@ void draw() {
        else {
          //Convert the thrust to Newtons so that the value matches the Estes documentation
          //curThrust = 0.0160651931 * curThrustRaw + 0.1727283196;
-         curThrust = 0.0079036704 * curThrustRaw - 0.3970384711; //Gives us the thrust in English pounds
+         //curThrust = 0.0079036704 * curThrustRaw - 0.3970384711; //Old calibration
+         curThrust = 0.0095566744 * curThrustRaw - 0.0652739447;//Gives us the thrust in English pounds
          curThrust = curThrust * 4.448; //Gives us the thrust in Newtons
        }
        
