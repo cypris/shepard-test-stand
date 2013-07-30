@@ -27,7 +27,8 @@ import controlP5.*; //Our graphics library
 boolean isReady = false; //Whether or not we're ready to receive data
 boolean aboveZero = false; //Tracks whether or not the voltage has gone above zero
 boolean serialEnabled = false; //Tracks whether or not we can start reading from the serial port
-char clientReady = 'R'; //The byte that tells the Arduino we're ready to start receiving data
+char clientReadyMsg = 'R'; //The byte that tells the Arduino we're ready to start receiving data
+char endMsg = 'Q'; //The byte that tells the Arduino we want to end communications //TODO: Implement an exit button to do this for us
 int dataID; //The ID used to separate between types of data coming from the Arduino
 int curThrustRaw; //The current thrust data value in 0 to 1023 format
 int numSamples = 1; //The number of samples taken so far
@@ -64,12 +65,13 @@ Slider curTempSlide; //The slider that will show the current thrust value
 Slider maxTempSlide; //The slider that will show the current thrust value
 Slider avgTempSlide; //The slider that will show the current thrust value
 Button recordButton; //The button that controls whether or not data will be recorded
-Button clearButton; //The clears the charts, averages, maxes, etc
+Button clearButton; //Clears the charts, averages, maxes, etc
+Button exitButton; //Cleanly exits the application, telling the Arduino that we want to disconnect
 DropdownList ddl1; //The drop down list holding the serial ports
 
 //Global I/O related variables
 PrintWriter csvFile; //The file that we'll save the test stand data to for each run
-Serial serialPort; //We talk over the serial/USB cable to the Arduino
+Serial serialPort = null; //We talk over the serial/USB cable to the Arduino
 String[] serialPorts; //The serial ports that are available on the system
 
 /*
@@ -112,7 +114,7 @@ void draw() {
     recordButton.getCaptionLabel().setText("Disable Recording");     
   }
   else {
-      recordButton.getCaptionLabel().setText("Enable Recording");                  
+    recordButton.getCaptionLabel().setText("Enable Recording");                  
   }   
     
   //Read data from the serial port and display it
@@ -120,17 +122,23 @@ void draw() {
 }
 
 
+private void Exit() {
+  //Let the Arduino know that we want to disconnect
+  serialPort.write(endMsg);
+  
+  //Stop the serial port
+  serialPort.stop();
+  
+  //Exit the application
+  exit();
+}
 
 /*
  * Called when the window is closed so we can clean up
  */
-void stop() {
-  println("HERE");
+void stop() {   
   //Stop the serial port
-  serialPort.stop();
-  
-  //Set the Arduino serial port to the new value (workaround to make the Arduino stop transmitting)
-  serialPort = new Serial(this, serialPorts[0], 115200);
+  serialPort.stop(); 
 }
 
 
@@ -141,7 +149,8 @@ void stop() {
 private void prepareExitHandler() {
   Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
     public void run () {      
-      try {
+      try {          
+        //Call the method/function that will clean up for us before exit
         stop();
       }
       catch (Exception ex) {
@@ -186,16 +195,27 @@ public void Clear(int theValue) {
  * Called when the dropdown list is changed
  */
 void controlEvent(ControlEvent theEvent) {  
-  if (theEvent.isGroup()) { 
+  if (theEvent.isGroup()) {     
     //Check to make sure we have serial ports available
     if (ddl1.getItem((int)theEvent.value()).getName() != "None Available") {      
-      //Stop the serial port so that it can be reset
-      serialPort.stop();
-    
+      //Check to make sure the serial port is already running
+      if (serialPort != null) {     
+        //Stop the serial port so that it can be reset
+        serialPort.stop();
+      }
+      
       //Set the Arduino serial port to the new value
       serialPort = new Serial(this, serialPorts[int(theEvent.group().value())], 115200);
-    }
-   //println(ddl1.getItem((int)theEvent.value()).getName());      
+      
+      //Let the rest of the code know that we can read from serial now
+      serialEnabled = true;
+      
+      //Wait for the serial port to get up and going
+      delay(2500);
+                        
+      //Tell the Arduino we're ready
+      serialPort.write(clientReadyMsg);           
+    }        
   }
 }
 
@@ -339,15 +359,13 @@ void setGradient(int x, int y, float w, float h, color c1, color c2, int axis ) 
 public void ReadSerial() {
   //Make sure that we're ready to read from the serial port
   if (serialEnabled) {
-    
-    //If we haven't started receiving yet, ask the Arduino for data We have to keep trying until the serial port is up and running
-    while (serialPort.available() == 0 && !isReady) {
-        //Tell the Arduino we're ready
-        serialPort.write(clientReady);  
-    
-        //Take a short break
-        delay(100);    
-    }
+    /*if(!isReady) {            
+      //Tell the Arduino we're ready
+      serialPort.write(clientReady);
+      
+      //Don't hammer the serial interface for no reason
+      delay(500);
+    }*/    
     
     //As long as we're getting data keep looping and reading from the port
     while (serialPort.available() >= 3) {
@@ -566,6 +584,16 @@ public void SetupGUI() {
                .setSize(650, 250)
                .setRange(0, 30)
                .setView(Chart.LINE);
+               
+  //Button to exit cleanly, telling the Arduino we want to disconnect
+  exitButton = cp5.addButton("Exit")
+     .setPosition(680, 20)
+     .setSize(100, 20)
+     .setId(2)
+     .registerTooltip("Exits cleanly");
+
+  //Align the caption text to the center of the button
+  exitButton.getCaptionLabel().alignX(ControlP5.CENTER);               
 
   //Chart background color
   thrustChart.getColor().setBackground(0xff02344d);
@@ -693,12 +721,6 @@ public void SetupSerial() {
     //Step through and add all of the serial ports to the dropdown list
     for(int i = 0; i < serialPorts.length; i++) {
       ddl1.addItem(serialPorts[i], i);
-    }
-    
-    //The serial port that the Arduino is connected to
-    serialPort = new Serial(this, Serial.list()[0], 115200);
-    
-    //Let the rest of the code know that we can read from serial now
-    serialEnabled = true;
+    }    
   }
 }

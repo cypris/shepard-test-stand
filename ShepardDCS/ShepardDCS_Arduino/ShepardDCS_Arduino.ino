@@ -25,7 +25,8 @@
  
 char incomingByte; //The byte being read to tell us whether or not a client is connected
 char isClientConnected = 0; //Whether or not a client is read to receive data from the Arduino
-char clientReady = 'R'; //The character that tells us whether or not the client is ready to recieve
+char clientReadyMsg = 'R'; //The character that tells us whether or not the client is ready to recieve
+char endMsg = 'Q'; //The message the client sends when it wants to disconnect
 int thrustPin = A0; //A0 is the input pin for load cell (thrust measurement)
 int thrustValue = 0; //The value 0-1023 from the load cell's analog pin
 int tempValue = 0; //The object temperature (in sans-decimal point Celsius format) of the I2C temperature sensor
@@ -42,16 +43,13 @@ void setup() {
   Serial.begin(115200);
   
   //Use the LED pin as an output pin
-  pinMode(ledPin, OUTPUT);
-  
-  //Wait for things to complete before moving on
-  delay(500);
+  pinMode(ledPin, OUTPUT);  
 }
 
 /*Step through continuously reading the sensor values*/
-void loop() {
+void loop() {    
   //If a client hasn't connected, we need to see if one wants to
-  if (Serial.available() > 0 && !isClientConnected) {    
+  /*if (!isClientConnected && Serial.available() > 0) {    
     //Check to see if a client is ready to receive data
     incomingByte = Serial.read();    
 
@@ -63,10 +61,10 @@ void loop() {
     else {
       delay(25);
     }    
-  }
+  }*/ 
   
   //Make sure that we're supposed to be transmitting data
-  if (isClientConnected) {
+  if (isClientConnected && Serial.available() == 0) {
     //Read the current value from the load cell (thrust sensor)
     thrustValue = analogRead(thrustPin);
     
@@ -89,10 +87,34 @@ void loop() {
     //Send the time stamp to the Processing app
     Serial.write(0xfd); //ID/control byte so Processing can distinguish sensors
     Serial.write((timeValue >> 8) & 0xff); //First byte
-    Serial.write(timeValue & 0xff); //Second byte
-    
-    //There should be a fairly large delay here, but we're going to
-    //deal with some errors in order to get a faster sample rate.
-    //delay(2);
+    Serial.write(timeValue & 0xff); //Second byte       
   }
+  else if (Serial.available() > 0) {
+    if (isClientConnected) {
+      //Check to see if a client is ready to receive data
+      incomingByte = Serial.read();
+       
+      //The client wants to disconnect
+      if ((char)incomingByte == endMsg) {
+        //Let the rest of the code know that the client has disconnected
+        isClientConnected = 0;
+        
+        //End the serial communications
+        //Serial.end();
+      }
+    }
+    else if (!isClientConnected) {
+      //Check to see if a client is ready to receive data
+      incomingByte = Serial.read();
+      
+      //The client is ready
+      if ((char)incomingByte == clientReadyMsg) {
+        //Let the rest of the code know that there's a client connected and ready to receive data
+        isClientConnected = 1;
+        
+        //Wait for a little while before trying to send anything
+        delay(500);
+      }
+    }
+  }  
 }
