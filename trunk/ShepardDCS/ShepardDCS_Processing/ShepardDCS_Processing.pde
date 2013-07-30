@@ -86,7 +86,10 @@ void setup()
   SetupGUI();   
  
   //Call the method that will find out what serial ports are available and set up our drop down
-  SetupSerial();    
+  SetupSerial();
+
+  //Allows us to add a handler for when the application Window is closed
+  prepareExitHandler();  
 }
 
 
@@ -114,6 +117,38 @@ void draw() {
     
   //Read data from the serial port and display it
   ReadSerial();
+}
+
+
+
+/*
+ * Called when the window is closed so we can clean up
+ */
+void stop() {
+  println("HERE");
+  //Stop the serial port
+  serialPort.stop();
+  
+  //Set the Arduino serial port to the new value (workaround to make the Arduino stop transmitting)
+  serialPort = new Serial(this, serialPorts[0], 115200);
+}
+
+
+
+/*
+ * Allows us to set things up to be shut down when the application window closes.
+ */
+private void prepareExitHandler() {
+  Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+    public void run () {      
+      try {
+        stop();
+      }
+      catch (Exception ex) {
+          ex.printStackTrace(); // not much else to do at this point
+      }             
+   }
+  }));
 }
 
 
