@@ -27,6 +27,7 @@ char incomingByte; //The byte being read to tell us whether or not a client is c
 char isClientConnected = 0; //Whether or not a client is read to receive data from the Arduino
 char clientReadyMsg = 'R'; //The character that tells us whether or not the client is ready to recieve
 char endMsg = 'Q'; //The message the client sends when it wants to disconnect
+char discoverMsg = 'D'; //Message the client uses to automatically find out which port the Arduino is on
 int thrustPin = A0; //A0 is the input pin for load cell (thrust measurement)
 int thrustValue = 0; //The value 0-1023 from the load cell's analog pin
 int tempValue = 0; //The object temperature (in sans-decimal point Celsius format) of the I2C temperature sensor
@@ -87,7 +88,11 @@ void loop() {
     //Send the time stamp to the Processing app
     Serial.write(0xfd); //ID/control byte so Processing can distinguish sensors
     Serial.write((timeValue >> 8) & 0xff); //First byte
-    Serial.write(timeValue & 0xff); //Second byte       
+    Serial.write(timeValue & 0xff); //Second byte 
+
+    //Make sure that all the characters get sent
+    //Serial.flush();    
+    //digitalWrite(ledPin, HIGH);
   }
   else if (Serial.available() > 0) {
     if (isClientConnected) {
@@ -100,15 +105,27 @@ void loop() {
         isClientConnected = 0;
         
         //End the serial communications
-        //Serial.end();
+        Serial.end();
+        
+        //Reset the Arduino to the beginning of the program
+        //asm volatile ("  jmp 0");                
       }
     }
     else if (!isClientConnected) {
       //Check to see if a client is ready to receive data
       incomingByte = Serial.read();
       
+      //The client is trying to discover which port the Arduino is on
+      if ((char)incomingByte == discoverMsg) {
+        //Wait for a second to give the client time to set up a recieve
+        //delay(500);
+        
+        //Echoing it back will tell the client they've found an Arduino
+        Serial.write(discoverMsg);
+        //Serial.flush();
+      }
       //The client is ready
-      if ((char)incomingByte == clientReadyMsg) {
+      else if ((char)incomingByte == clientReadyMsg) {
         //Let the rest of the code know that there's a client connected and ready to receive data
         isClientConnected = 1;
         

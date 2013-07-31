@@ -29,6 +29,7 @@ boolean aboveZero = false; //Tracks whether or not the voltage has gone above ze
 boolean serialEnabled = false; //Tracks whether or not we can start reading from the serial port
 char clientReadyMsg = 'R'; //The byte that tells the Arduino we're ready to start receiving data
 char endMsg = 'Q'; //The byte that tells the Arduino we want to end communications //TODO: Implement an exit button to do this for us
+char discoverMsg = 'D'; //The byte that tells the Arduino that we've searching for it
 int dataID; //The ID used to separate between types of data coming from the Arduino
 int curThrustRaw; //The current thrust data value in 0 to 1023 format
 int numSamples = 1; //The number of samples taken so far
@@ -99,7 +100,7 @@ void setup()
 /*
  * Draws the GUI and all its components for us
  */
-void draw() {
+void draw() {    
   //Set the background up as a gradient
   setGradient(0, 0, width, height, c1, c2, Y_AXIS);
   
@@ -115,17 +116,17 @@ void draw() {
   }
   else {
     recordButton.getCaptionLabel().setText("Enable Recording");                  
-  }   
-    
+  } 
+
   //Read data from the serial port and display it
-  ReadSerial();
+  ReadSerial();  
 }
 
 
 private void Exit() {
   //Let the Arduino know that we want to disconnect
   serialPort.write(endMsg);
-  
+ 
   //Stop the serial port
   serialPort.stop();
   
@@ -214,7 +215,8 @@ void controlEvent(ControlEvent theEvent) {
       delay(2500);
                         
       //Tell the Arduino we're ready
-      serialPort.write(clientReadyMsg);           
+      serialPort.write(clientReadyMsg);
+      //serialPort.write(82);      
     }        
   }
 }
@@ -710,6 +712,8 @@ public void SetupGUI() {
  * Sets up the serial related drop down
  */
 public void SetupSerial() {
+  char character; //The character we're waiting for during autodiscovery
+  
   //Check to see if there are any serial ports
   if (Serial.list().length == 0) {
     ddl1.addItem("None Available", 0);
@@ -720,7 +724,36 @@ public void SetupSerial() {
     
     //Step through and add all of the serial ports to the dropdown list
     for(int i = 0; i < serialPorts.length; i++) {
-      ddl1.addItem(serialPorts[i], i);
+      ddl1.addItem(serialPorts[i], i);     
+      
+      //Set the Arduino serial port to the new value
+      /*serialPort = new Serial(this, serialPorts[i], 115200);
+      
+      //Wait for the serial port to get up and going
+      delay(2500);
+      
+      //Try to send the discovery character to the port to see what happens      
+      serialPort.write(discoverMsg);
+      println("HERE1");
+      //Wait for a few cycles for a response
+      while (serialPort.available() == 0) {
+        //TODO: Wait for a number of milliseconds before moving onto the next port
+      }
+      println("HERE2");
+                     
+      //Figure out if we got the discovery character back
+      character = serialPort.readChar();
+      
+      println(character);
+      
+      //Check to see what character we got
+      if (character == 'D') {
+        break;
+        //TODO: Put the autoselect code in here to select the right serial port
+      }      
+      
+      //Stop the serial port so that it can be reset
+      serialPort.stop();*/
     }    
   }
 }
