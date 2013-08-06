@@ -22,6 +22,7 @@
  */
 
 #include "Mach30_I2C.h"
+//#include <i2cmaster.h>
  
 char incomingByte; //The byte being read to tell us whether or not a client is connected
 char isClientConnected = 0; //Whether or not a client is read to receive data from the Arduino
@@ -39,12 +40,15 @@ Mach30_I2C i2cInterface; //Represents the Mach 30 library for reading from the M
 void setup() {
   //Initialize the MLX90614 sensor
   i2cInterface.i2c_init();
-
+  
   //Set up serial comms
   Serial.begin(115200);
   
+  //Enable pullup resistors
+  //PORTC = (1 << PORTC4) | (1 << PORTC5);
+  
   //Use the LED pin as an output pin
-  pinMode(ledPin, OUTPUT);  
+  //pinMode(ledPin, OUTPUT);  
 }
 
 /*Step through continuously reading the sensor values*/
@@ -64,6 +68,26 @@ void loop() {
     }    
   }*/ 
   
+  /*int dev = 0x5A<<1;
+  int data_low = 0;
+  int data_high = 0;
+  int pec = 0;
+  
+  i2c_rep_start(dev+I2C_READ);
+  data_low = i2c_readAck(); //Read 1 byte and then send ack
+  data_high = i2c_readAck(); //Read 1 byte and then send ack
+  pec = i2c_readNak();
+  i2c_stop();
+  
+  //This converts high and low bytes together and processes temperature, MSB is a error bit and is ignored for temps
+  double tempFactor = 0.02; // 0.02 degrees per LSB (measurement resolution of the MLX90614)
+  double tempData = 0x0000; // zero out the data
+  int frac; // data past the decimal point
+  
+  //This masks off the error bit of the high byte, then moves it left 8 bits and adds the low byte.
+  tempData = (double)(((data_high & 0x007F) << 8) + data_low);
+  tempValue = ((tempData * tempFactor)-0.01) - 273.13;*/
+  
   //Make sure that we're supposed to be transmitting data
   if (isClientConnected && Serial.available() == 0) {
     //Read the current value from the load cell (thrust sensor)
@@ -71,6 +95,7 @@ void loop() {
     
     //Read the current value from the I2C temperature sensor
     tempValue = i2cInterface.get_celcius_temp(OBJECT_TEMP);
+    //tempValue = -27313;
     
     //Read the current time value in milliseconds
     timeValue = millis(); //TODO: Make sure we never get an overrun here
@@ -124,13 +149,24 @@ void loop() {
         Serial.write(discoverMsg);
         //Serial.flush();
       }
-      //The client is ready
+      //The client is ready to receive
       else if ((char)incomingByte == clientReadyMsg) {
         //Let the rest of the code know that there's a client connected and ready to receive data
         isClientConnected = 1;
         
         //Wait for a little while before trying to send anything
         delay(500);
+      }
+      //The client wants to disconnect
+      else if ((char)incomingByte == endMsg) {
+        //Let the rest of the code know that the client has disconnected
+        isClientConnected = 0;
+        
+        //End the serial communications
+        Serial.end();
+        
+        //Reset the Arduino to the beginning of the program
+        //asm volatile ("  jmp 0");                
       }
     }
   }  
