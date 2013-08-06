@@ -41,35 +41,39 @@ int16_t Mach30_I2C::get_celcius_temp(unsigned char ambObjTemp) {
   i2c_init();
 
   //Start an I2C write transmission, waiting for the device to become available
-  i2c_start(device + WRITE_MODE);
+  if(i2c_start_wait(device + WRITE_MODE)) {
+    //We want to read the ambient temperature
+    if(ambObjTemp) {
+      //Ambient
+      i2c_write(0x06);
+    }
+    else {
+      //Object
+      i2c_write(0x07);
+    }
 
-  //We want to read the ambient temperature
-  if(ambObjTemp) {
-    //Ambient
-    i2c_write(0x06);
-  }
+    //Shift the device into read mode and make sure we got a value
+    i2c_start_wait(device + READ_MODE);
+    
+    //Get the two bytes that we'll combine into our Celcius value
+    lsb = i2c_readAck(); //Get the Least Significant Bit from the I2C device
+    msb = i2c_readAck(); //Get the Most Significant Bit from the I2C device
+
+    //Stop the read process
+    i2c_readNack();
+    i2c_stop();
+
+    //Combine the MSB and LSB bytes into a single value
+    tempValue = (int16_t)(msb << 8 | lsb);
+
+    //Convert the temperature
+    tempValue = tempValue * 2;
+    tempValue = tempValue - 27315;
+  }   
   else {
-    //Object
-    i2c_write(0x07);
-  }
-
-  //Shift the device into read mode
-  i2c_start(device + READ_MODE);
-
-  //Get the two bytes that we'll combine into our Celcius value
-  lsb = i2c_readAck(); //Get the Least Significant Bit from the I2C device
-  msb = i2c_readAck(); //Get the Most Significant Bit from the I2C device
-
-  //Stop the read process
-  i2c_readNack();
-  i2c_stop();
-
-  //Combine the MSB and LSB bytes into a single value
-  tempValue = (int16_t)(msb << 8 | lsb);
-
-  //Convert the temperature
-  tempValue = tempValue * 2;
-  tempValue = tempValue - 27315;
+    //Give this default to let the user know the sensor's not connected
+    tempValue = -27313;
+  } 
 
   return tempValue;
 }
@@ -126,8 +130,61 @@ unsigned char Mach30_I2C::i2c_readNack(void) {
 }
 
 /* Sends a start condition along with setting up address and direction.
-   waits on the device to become available by default. */
+   Does not wait on the device to become available by default. */
 unsigned char Mach30_I2C::i2c_start(unsigned char addr) {
+  uint8_t i2cStatus; //The Status Register value
+
+  //Loop until the device is ready
+  //while(1) {
+    //Send the start condition
+    TWCR = (1 << TWINT) | (1 << TWSTA) | (1 << TWEN);
+
+    //Wait for send to complete, but don't wait forever
+    //while(!(TWCR & (1 << TWINT)));
+    /*for (uint32_t i = 0; i < 1; i++) {
+      //If the send is complete we can move on
+      if (TWCR & (1 << TWINT)) {
+        break;
+      }
+    }*/
+
+    //Grab the current status from the register
+    i2cStatus = TW_STATUS & 0xF8;
+
+    //Check to see if either a start or repeated start condition was transmitted
+    if (i2cStatus != TW_START && i2cStatus != TW_REP_START) {
+      //The device isn't ready, so get ready for the next round
+      return 1;
+    }
+
+    //Send the address of the device we want to access
+    TWDR = addr;
+    TWCR = (1 << TWINT) | (1 << TWEN);
+
+    //Again, wait until this transmit has completed, but don't wait forever
+    /*for (int i = 0; i < 1; i++) {
+      //If the send is complete we can move on
+      if (TWCR & (1 << TWINT)) {
+        break;
+      }
+    }*/
+
+    //Grab the current status from the register
+    i2cStatus = TW_STATUS & 0xF8;
+
+    //If we got a send confirmation but a NAK back, or the data was received but we got a NAK
+    if (i2cStatus != TW_MT_SLA_ACK || i2cStatus != TW_MR_SLA_ACK) {      
+      return 1;
+    }
+
+    //We've presumably read the data successfully
+    return 0;
+  //}
+}
+
+/* Sends a start condition along with setting up address and direction.
+   Waits on the device to become available by default. */
+unsigned char Mach30_I2C::i2c_start_wait(unsigned char addr) {
   uint8_t i2cStatus; //The Status Register value
 
   //Loop until the device is ready
@@ -184,15 +241,15 @@ unsigned char Mach30_I2C::i2c_write( unsigned char data) {
   while(!(TWCR & (1 << TWINT)));
 
   //Grab the current status from the register
-    i2cStatus = TW_STATUS & 0xF8;
+  i2cStatus = TW_STATUS & 0xF8;
 
-    //See if the write is acknowledged
-    if (i2cStatus != TW_MT_DATA_ACK) {
-      //Failure
-      return 1;
-    }
-    else {
-      //Success
-      return 0;
-    }
+  //See if the write is acknowledged
+  if (i2cStatus != TW_MT_DATA_ACK) {
+    //Failure
+    return 1;
+  }
+  else {
+    //Success
+    return 0;
+  }
 }
