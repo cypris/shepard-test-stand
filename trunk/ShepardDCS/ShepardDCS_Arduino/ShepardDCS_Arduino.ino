@@ -73,7 +73,7 @@ void loop() {
     tempValue = i2cInterface.get_celcius_temp(OBJECT_TEMP);
     
     //Read the current time value in milliseconds
-    timeValue = millis();
+    timeValue = millis(); //TODO: Make sure we never get an overrun here
   
     //Send the thrust value to the Processing app
     Serial.write(0xff); //ID/control byte so Processing can distinguish sensors
