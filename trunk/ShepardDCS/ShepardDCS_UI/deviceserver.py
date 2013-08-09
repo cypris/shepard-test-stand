@@ -4,12 +4,12 @@
 import glob
 import os
 import platform
-import Queue
+import queue
 import serial
-from serial.tools import list_ports
+#from serial.tools import list_ports
 import signal
 import socket
-import SocketServer
+import socketserver
 import struct
 import sys
 import threading
@@ -45,7 +45,7 @@ class DeviceInterface:
     def close_device(self):
         """Attempts to gracefully close the connection with the Mach 30 device"""
 
-        self.device.write("Q")
+        self.device.write(bytes("Q", 'UTF-8'))
         
     def device_active(self):
         """Tells a caller whether or not the device is connected and active"""
@@ -80,14 +80,15 @@ class SerialInterface(DeviceInterface):
     def discover_device(self):        
         """Queries possible serial devices to see if they're Shepard devices"""
 
-        print "Trying to find Mach 30 device(s)..."
+        print("Trying to find Mach 30 device(s)...")
 
         # Get a list of the serial devices avaialble so we can query them
-        self.device_locations = self.list_serial_ports()        
+        #self.device_locations = self.list_serial_ports()
+        self.device_locations = [ '/dev/ttyACM0', '/dev/ttyACM1' ]
         
         # We have to walk through and try ports until we find our device
         for location in self.device_locations:
-            print "Trying ", location
+            print("Trying ", location)
 
             # Attempt to connect to a Shepard device via serial
             try:
@@ -98,11 +99,12 @@ class SerialInterface(DeviceInterface):
                 time.sleep(2.5)
 
                 # If it's a Shepard device it should echo this back
-                self.device.write("D")
+                self.device.write(bytes("D", 'UTF-8'))
+                self.device.flush()
                                 
                 # If we got a 'D' back, we have a Shepard device
                 if self.device.read(1) == 'D':
-                    print "Device Found on", location
+                    print("Device Found on", location)
 
                 break
             except Exception as inst:
@@ -112,10 +114,10 @@ class SerialInterface(DeviceInterface):
     def list_serial_ports(self):
         """Gets a list of the serial ports available on the 3 major OSes"""
 
-        print "Listing the avaliable serial ports..."
+        print("Listing the avaliable serial ports...")
 
         # Try the simple method to get a list of the serial ports first
-        serial_ports = list_ports.comports()
+        serial_ports = serial.tools.list_ports.comports()
         port_files = [] # Holds just the names of the ports and nothing else                
 
         # TODO: There will most likely be some extra work that is required for the Windows ports
@@ -139,10 +141,11 @@ class SerialInterface(DeviceInterface):
     def start_datastreaming(self):
         """Streams the data from the device into the cross-thread queue"""
 
-        print "Beginning to stream data from the device..."
+        print("Beginning to stream data from the device...")
 
         # A Mach 30 device will see this as a start transmission character
-        self.device.write("R")
+        self.device.write(bytes("R", 'UTF-8'))
+        self.device.flush()
 
         # Used to store our calculated values from the device
         data_list = []
@@ -151,10 +154,10 @@ class SerialInterface(DeviceInterface):
         while True:
             # Read the control and data bytes from the device
             control_byte = self.device.read(1)
-            data_bytes = self.device.read(2)            
+            data_bytes = self.device.read(2)
 
             # Check to see which type of data we have coming back in
-            if control_byte == '\xff': # Thrust data
+            if control_byte == b'\xff': # Thrust data                
                 # Convert the raw thrust bytes to an integer
                 raw_thrust = struct.unpack(">h", data_bytes[0:2])[0]
 
@@ -165,7 +168,7 @@ class SerialInterface(DeviceInterface):
                 data_list.append(str(calib_thrust))
 
                 #print "Thrust Data:", calib_thrust
-            elif control_byte == '\xfe': # Temperature data
+            elif control_byte == b'\xfe': # Temperature data
                 # Convert the raw temperature bytes to an integer
                 raw_temperature = struct.unpack(">h", data_bytes[0:2])[0]
 
@@ -176,7 +179,7 @@ class SerialInterface(DeviceInterface):
                 data_list.append(str(temperature))
 
                 #print "Temperature Data:", temperature
-            elif control_byte == '\xfd': # Timestamp data
+            elif control_byte == b'\xfd': # Timestamp data
                 time_stamp = struct.unpack(">h", data_bytes[0:2])[0]
 
                 # Save our time stamp value so we can send it to the client
@@ -195,7 +198,7 @@ class SerialInterface(DeviceInterface):
     def signal_handler(self, signal, frame):
         """Handles the case of the user hitting ctrl+c"""
 
-        print "Attempting to close connection with device..."        
+        print("Attempting to close connection with device...")
 
         # Make sure the device is connected
         if self.device_active():
@@ -204,7 +207,7 @@ class SerialInterface(DeviceInterface):
         sys.exit(0)
 
 # The queue for sending data between the serial and TCP threads
-q = Queue.Queue(1000)
+q = queue.Queue(1000)
 
 def main():
     """Just here to help us test the code incrementally"""    
@@ -219,13 +222,13 @@ def main():
     HOST, PORT = "localhost", 9999
 
     # Create the server, binding to localhost on port 9999
-    server = SocketServer.TCPServer((HOST, PORT), TCPHandler)
+    server = socketserver.TCPServer((HOST, PORT), TCPHandler)
 
     # TODO: Doesn't seem to help with a SocketServer object
     # Make sure we don't get locked out of the port when hitting CTRL-C
     #server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-    print "Waiting on client to connect and request streaming..."
+    print("Waiting on client to connect and request streaming...")
 
     # Activate the server; this will keep running until you interrupt the program with Ctrl-C
     server.serve_forever()
@@ -238,7 +241,7 @@ def main():
 
     #interface.start_datastreaming()
 
-class TCPHandler(SocketServer.BaseRequestHandler):
+class TCPHandler(socketserver.BaseRequestHandler):
     """Handles TCP requests from our client UI."""
 
     in_data = None # The data coming from the client
@@ -253,9 +256,9 @@ class TCPHandler(SocketServer.BaseRequestHandler):
 
         # The client has to ask to start the data streaming
         self.in_data = self.request.recv(1024).strip()
-
+        
         # Check to see if the client is ready for data streaming
-        if self.in_data == "R":            
+        if self.in_data.decode("utf-8") == "R":        
             # Gives us access to a stream of the data coming back from a Shepard device
             interface = SerialInterface()
 
@@ -272,7 +275,7 @@ class TCPHandler(SocketServer.BaseRequestHandler):
 
         # Begin streaming the data to the client
         while True:
-            self.request.sendall(q.get() + '\n')
+            self.request.sendall(bytes(q.get() + '\n', 'UTF-8'))
             q.task_done()
 
 if __name__ == "__main__":
