@@ -4,7 +4,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *             http://www.apache.org/licenses/LICENSE-2.0
 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -38,136 +38,84 @@ Mach30_I2C i2cInterface; //Represents the Mach 30 library for reading from the M
 
 /*Sets the sketch up for use*/
 void setup() {
-  //Initialize the MLX90614 sensor
-  i2cInterface.i2c_init();
-  
-  //Set up serial comms
-  Serial.begin(115200);
-  
-  //Enable pullup resistors
-  //PORTC = (1 << PORTC4) | (1 << PORTC5);
-  
-  //Use the LED pin as an output pin
-  //pinMode(ledPin, OUTPUT);  
+    //Initialize the MLX90614 sensor
+    i2cInterface.i2c_init();
+    
+    //Set up serial comms
+    Serial.begin(115200);
 }
 
 /*Step through continuously reading the sensor values*/
 void loop() {    
-  //If a client hasn't connected, we need to see if one wants to
-  /*if (!isClientConnected && Serial.available() > 0) {    
-    //Check to see if a client is ready to receive data
-    incomingByte = Serial.read();    
-
-    //Check to see if were told the client is ready
-    if ((char)incomingByte == clientReady) {
-      //Let the rest of the code know that there's a client connected and ready to receive data
-      isClientConnected = 1;
-    }  
-    else {
-      delay(25);
+    //Make sure that we're supposed to be transmitting data
+    if (isClientConnected && Serial.available() == 0) {
+        //Read the current value from the load cell (thrust sensor)
+        thrustValue = analogRead(thrustPin);
+        
+        //Read the current value from the I2C temperature sensor
+        //tempValue = i2cInterface.get_celcius_temp(OBJECT_TEMP);
+        tempValue = -273.13;
+        
+        //Read the current time value in milliseconds
+        timeValue = millis(); //TODO: Make sure we never get an overrun here
+    
+        //Send the thrust value to the Processing app
+        Serial.write(0xff); //ID/control byte so Processing can distinguish sensors
+        Serial.write((thrustValue >> 8) & 0xff); //The first byte
+        Serial.write(thrustValue & 0xff); //The second byte
+            
+        //Send the temperature value to the Processing app
+        Serial.write(0xfe); //ID/control byte so Processing can distinguish sensors        
+        Serial.write((tempValue >> 8) & 0xff); //First byte
+        Serial.write(tempValue & 0xff); //Second byte
+            
+        //Send the time stamp to the Processing app
+        Serial.write(0xfd); //ID/control byte so Processing can distinguish sensors
+        Serial.write((timeValue >> 8) & 0xff); //First byte
+        Serial.write(timeValue & 0xff); //Second byte 
+    }
+    else if (Serial.available() > 0) {
+        if (isClientConnected) {
+            //Check to see if a client is ready to receive data
+            incomingByte = Serial.read();
+             
+            //The client wants to disconnect
+            if ((char)incomingByte == endMsg) {
+                //Let the rest of the code know that the client has disconnected
+                isClientConnected = 0;
+                
+                //End the serial communications
+                Serial.end();                             
+            }
+        }
+        else {
+            //Check to see if a client is ready to receive data
+            incomingByte = Serial.read();
+            
+            //The client is trying to discover which port the Arduino is on
+            if ((char)incomingByte == discoverMsg) {                
+                // Echoing it back will tell the client they've found an Arduino
+                Serial.write(discoverMsg);
+            }
+            //The client is ready to receive
+            else if ((char)incomingByte == clientReadyMsg) {
+                //Let the rest of the code know that there's a client connected and ready to receive data
+                isClientConnected = 1;
+                
+                //Wait for a little while before trying to send anything
+                delay(500);
+            }
+            //The client wants to disconnect
+            else if ((char)incomingByte == endMsg) {
+                //Let the rest of the code know that the client has disconnected
+                isClientConnected = 0;
+                
+                //End the serial communications
+                Serial.end();  
+            }
+            else {
+              Serial.write(incomingByte);
+            }
+        }
     }    
-  }*/ 
-  
-  /*int dev = 0x5A<<1;
-  int data_low = 0;
-  int data_high = 0;
-  int pec = 0;
-  
-  i2c_rep_start(dev+I2C_READ);
-  data_low = i2c_readAck(); //Read 1 byte and then send ack
-  data_high = i2c_readAck(); //Read 1 byte and then send ack
-  pec = i2c_readNak();
-  i2c_stop();
-  
-  //This converts high and low bytes together and processes temperature, MSB is a error bit and is ignored for temps
-  double tempFactor = 0.02; // 0.02 degrees per LSB (measurement resolution of the MLX90614)
-  double tempData = 0x0000; // zero out the data
-  int frac; // data past the decimal point
-  
-  //This masks off the error bit of the high byte, then moves it left 8 bits and adds the low byte.
-  tempData = (double)(((data_high & 0x007F) << 8) + data_low);
-  tempValue = ((tempData * tempFactor)-0.01) - 273.13;*/
-  
-  //Make sure that we're supposed to be transmitting data
-  if (isClientConnected && Serial.available() == 0) {
-    //Read the current value from the load cell (thrust sensor)
-    thrustValue = analogRead(thrustPin);
-    
-    //Read the current value from the I2C temperature sensor
-    tempValue = i2cInterface.get_celcius_temp(OBJECT_TEMP);
-    //tempValue = -27313;
-    
-    //Read the current time value in milliseconds
-    timeValue = millis(); //TODO: Make sure we never get an overrun here
-  
-    //Send the thrust value to the Processing app
-    Serial.write(0xff); //ID/control byte so Processing can distinguish sensors
-    Serial.write((thrustValue >> 8) & 0xff); //The first byte
-    Serial.write(thrustValue & 0xff); //The second byte
-      
-    //Send the temperature value to the Processing app
-    Serial.write(0xfe); //ID/control byte so Processing can distinguish sensors    
-    Serial.write((tempValue >> 8) & 0xff); //First byte
-    Serial.write(tempValue & 0xff); //Second byte
-      
-    //Send the time stamp to the Processing app
-    Serial.write(0xfd); //ID/control byte so Processing can distinguish sensors
-    Serial.write((timeValue >> 8) & 0xff); //First byte
-    Serial.write(timeValue & 0xff); //Second byte 
-
-    //Make sure that all the characters get sent
-    //Serial.flush();    
-    //digitalWrite(ledPin, HIGH);
-  }
-  else if (Serial.available() > 0) {
-    if (isClientConnected) {
-      //Check to see if a client is ready to receive data
-      incomingByte = Serial.read();
-       
-      //The client wants to disconnect
-      if ((char)incomingByte == endMsg) {
-        //Let the rest of the code know that the client has disconnected
-        isClientConnected = 0;
-        
-        //End the serial communications
-        Serial.end();
-        
-        //Reset the Arduino to the beginning of the program
-        //asm volatile ("  jmp 0");                
-      }
-    }
-    else if (!isClientConnected) {
-      //Check to see if a client is ready to receive data
-      incomingByte = Serial.read();
-      
-      //The client is trying to discover which port the Arduino is on
-      if ((char)incomingByte == discoverMsg) {
-        //Wait for a second to give the client time to set up a recieve
-        //delay(500);
-        
-        //Echoing it back will tell the client they've found an Arduino
-        Serial.write(discoverMsg);
-        //Serial.flush();
-      }
-      //The client is ready to receive
-      else if ((char)incomingByte == clientReadyMsg) {
-        //Let the rest of the code know that there's a client connected and ready to receive data
-        isClientConnected = 1;
-        
-        //Wait for a little while before trying to send anything
-        delay(500);
-      }
-      //The client wants to disconnect
-      else if ((char)incomingByte == endMsg) {
-        //Let the rest of the code know that the client has disconnected
-        isClientConnected = 0;
-        
-        //End the serial communications
-        Serial.end();
-        
-        //Reset the Arduino to the beginning of the program
-        //asm volatile ("  jmp 0");                
-      }
-    }
-  }  
 }
