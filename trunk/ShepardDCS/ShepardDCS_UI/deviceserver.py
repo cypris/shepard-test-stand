@@ -84,7 +84,7 @@ class SerialInterface(DeviceInterface):
 
         # Get a list of the serial devices avaialble so we can query them
         #self.device_locations = self.list_serial_ports()
-        self.device_locations = [ '/dev/ttyACM0', '/dev/ttyACM1' ]
+        self.device_locations = [ 'COM4', 'COM4:' ]
         
         # We have to walk through and try ports until we find our device
         for location in self.device_locations:
