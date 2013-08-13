@@ -47,10 +47,12 @@ public abstract class ShepardSerialEventListener implements SerialPortEventListe
   
   @Override
   public void serialEvent(SerialPortEvent event)
-  {
+  {    
     // RX events are the only ones with data
     if (event.isRXCHAR() || event.isRXFLAG())
     {
+      int i = 0;
+      System.out.println("Processing " + event.getEventValue() + " bytes of data...");
       try
       {
         // retrieve all the data available, and wrap it in a stream for 
@@ -106,6 +108,13 @@ public abstract class ShepardSerialEventListener implements SerialPortEventListe
               System.out.println("Encountered unknown control code " + controlCode);
               break;
           }
+          
+          if (datapoint.isSet())
+          {
+            handleData();
+            i++;
+            datapoint.clear();
+          }
         }
       } 
       catch (SerialPortException spex)
@@ -115,11 +124,8 @@ public abstract class ShepardSerialEventListener implements SerialPortEventListe
       {          
       }
       
-      if (datapoint.isSet())
-      {
-        handleData();
-        datapoint.clear();
-      }
+      System.out.println(i + " data points");
+      System.out.println();
     }
   }
   
