@@ -44,50 +44,12 @@ void setup() {
   //Set up serial comms
   Serial.begin(115200);
   
-  //Enable pullup resistors
-  //PORTC = (1 << PORTC4) | (1 << PORTC5);
-  
   //Use the LED pin as an output pin
   //pinMode(ledPin, OUTPUT);  
 }
 
 /*Step through continuously reading the sensor values*/
 void loop() {    
-  //If a client hasn't connected, we need to see if one wants to
-  /*if (!isClientConnected && Serial.available() > 0) {    
-    //Check to see if a client is ready to receive data
-    incomingByte = Serial.read();    
-
-    //Check to see if were told the client is ready
-    if ((char)incomingByte == clientReady) {
-      //Let the rest of the code know that there's a client connected and ready to receive data
-      isClientConnected = 1;
-    }  
-    else {
-      delay(25);
-    }    
-  }*/ 
-  
-  /*int dev = 0x5A<<1;
-  int data_low = 0;
-  int data_high = 0;
-  int pec = 0;
-  
-  i2c_rep_start(dev+I2C_READ);
-  data_low = i2c_readAck(); //Read 1 byte and then send ack
-  data_high = i2c_readAck(); //Read 1 byte and then send ack
-  pec = i2c_readNak();
-  i2c_stop();
-  
-  //This converts high and low bytes together and processes temperature, MSB is a error bit and is ignored for temps
-  double tempFactor = 0.02; // 0.02 degrees per LSB (measurement resolution of the MLX90614)
-  double tempData = 0x0000; // zero out the data
-  int frac; // data past the decimal point
-  
-  //This masks off the error bit of the high byte, then moves it left 8 bits and adds the low byte.
-  tempData = (double)(((data_high & 0x007F) << 8) + data_low);
-  tempValue = ((tempData * tempFactor)-0.01) - 273.13;*/
-  
   //Make sure that we're supposed to be transmitting data
   if (isClientConnected && Serial.available() == 0) {
     //Read the current value from the load cell (thrust sensor)
@@ -119,7 +81,6 @@ void loop() {
 
     //Make sure that all the characters get sent
     //Serial.flush();    
-    //digitalWrite(ledPin, HIGH);
   }
   else if (Serial.available() > 0) {
     if (isClientConnected) {
@@ -134,7 +95,7 @@ void loop() {
         //End the serial communications
         Serial.end();
         
-        //Reset the Arduino to the beginning of the program
+        //Reset the Arduino to the beginning of the program using Assembly
         //asm volatile ("  jmp 0");                
       }
     }
@@ -167,7 +128,7 @@ void loop() {
         //End the serial communications
         Serial.end();
         
-        //Reset the Arduino to the beginning of the program
+        //Reset the Arduino to the beginning of the program using Assembly
         //asm volatile ("  jmp 0");                
       }
     }
