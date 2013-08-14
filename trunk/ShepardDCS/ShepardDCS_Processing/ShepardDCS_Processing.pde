@@ -361,7 +361,7 @@ void setGradient(int x, int y, float w, float h, color c1, color c2, int axis ) 
 public void ReadSerial() {
   //Make sure that we're ready to read from the serial port
   if (serialEnabled) {
-    /*if(!isReady) {            
+    /*if(!isReady) {      
       //Tell the Arduino we're ready
       serialPort.write(clientReady);
       
@@ -483,7 +483,7 @@ public void ReadSerial() {
       //Check to see if we have temperature data coming in
       else if(dataID == 0xfd) {
         //Read the time stamp from the serial port as a string
-        curTime = ((serialPort.read() << 8) | (serialPort.read()));
+        curTime = ((serialPort.read() << 24) | (serialPort.read() << 16) | (serialPort.read() << 8) | (serialPort.read()));
         
         //Make sure that the user wants to record before you add the data to the charts
         if(recordButton.getBooleanValue() && curThrust > triggerThrust) {            
