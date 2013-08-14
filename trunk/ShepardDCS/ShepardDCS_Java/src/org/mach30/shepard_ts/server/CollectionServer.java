@@ -32,6 +32,11 @@ public abstract class CollectionServer
   
   protected SerialPort port = null;
   
+  // TODO: see if there's a better way to handle this than making it static.
+  // currently, this seems to be the only way to make it so that the threads
+  // can see it
+  static boolean deviceConnected = false;
+  
   protected String status = "";
   
   
@@ -213,11 +218,15 @@ public abstract class CollectionServer
               status = "Connected on port " + name;
               System.out.println(status);
               
+              deviceConnected = true;
+              
               break;
             }
             else
             {
+              currport.removeEventListener();
               currport.closePort();
+              currport = null;
             }
           }
         }
@@ -229,6 +238,12 @@ public abstract class CollectionServer
         {
           ex = new Exception("An interrupt was encountered.", iex);
         }
+      }
+      
+      if (currport == null)
+      {
+        status = "Unable to connect to Data Collection Hardware";
+        System.err.println(status);
       }
     }
     

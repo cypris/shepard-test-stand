@@ -26,6 +26,10 @@ public abstract class ShepardSerialEventListener implements SerialPortEventListe
   // buffer used for conversion from bytes to value types
   private ByteBuffer convBuf = ByteBuffer.allocate(256); 
   
+  // the time the first datapoint was collected, used for measuring sample rate
+  private long start = 0;
+  private long samples = 0;
+  
   protected ShepardData datapoint = new ShepardData();
   
   
@@ -47,10 +51,15 @@ public abstract class ShepardSerialEventListener implements SerialPortEventListe
   
   @Override
   public void serialEvent(SerialPortEvent event)
-  {    
+  {
     // RX events are the only ones with data
     if (event.isRXCHAR() || event.isRXFLAG())
     {
+      if (start == 0)
+      {
+        start = System.currentTimeMillis();
+      }
+      
       int i = 0;
       System.out.println("Processing " + event.getEventValue() + " bytes of data...");
       try
@@ -124,8 +133,12 @@ public abstract class ShepardSerialEventListener implements SerialPortEventListe
       {          
       }
       
-      System.out.println(i + " data points");
-      System.out.println();
+      samples += i;
+      double rate = System.currentTimeMillis() - start;
+      rate /= 1000.0f;
+      rate = samples / rate;
+      rate = Math.round(rate);
+      System.out.println(i + " data points, ~" + (int)rate + "Samples/s");
     }
   }
   

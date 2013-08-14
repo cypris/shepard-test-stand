@@ -48,7 +48,6 @@ public class TcpCollectionServer extends CollectionServer
   @Override
   public void handleClient() throws Exception
   {
-
     try 
     {
       serverSocket = new ServerSocket(serverPort);
@@ -169,11 +168,25 @@ public class TcpCollectionServer extends CollectionServer
           clientOut.println("Current server status: " + status);
         }
         
+        
         try
         {
           String input = null;
           while ((input = clientIn.readLine()) != null)
           {
+            // if the device is not yet connected, wait to execute client commands
+            while (port == null || !CollectionServer.deviceConnected)
+            {
+              System.out.println("Waiting for device connection... (" + (port == null) + "," + !CollectionServer.deviceConnected + ")");
+              try
+              {
+                Thread.sleep(250);
+              }
+              catch (InterruptedException e)
+              {
+              }
+            }
+            
             System.out.println("Received from client: " + input);
             if ("R".equals(input))
             {
@@ -190,12 +203,30 @@ public class TcpCollectionServer extends CollectionServer
                 close();
               }
             }
+
+            if ("Q".equals(input))
+            {
+              System.out.println("Quit command received.  Stopping data collection...");
+              try
+              {
+                port.writeByte((byte) 0x51);
+                System.out.println("Command sent to DCS.");
+              }
+              catch (SerialPortException spex)
+              {
+                System.err.println(spex);
+                close();
+              }
+            }
           }
+          
+          // if we've reached here, it means that the client has been disconnected
+          closeClientConnection();
         }
-        catch (IOException ioex)
+        catch (Exception ex)
         {
           System.err.println("An error was encountered communicating with the client");
-          System.err.println(ioex);
+          System.err.println(ex);
           closeClientConnection();
         }
       }
@@ -209,12 +240,16 @@ public class TcpCollectionServer extends CollectionServer
     {
       try
       {
+        clientIn.close();
+        clientOut.close();
         clientSocket.close();
       }
       catch (IOException ioex2)
       {
       }
       clientSocket = null;
+      clientIn = null;
+      clientOut = null;
     }
     
   }
@@ -222,9 +257,7 @@ public class TcpCollectionServer extends CollectionServer
 
   private class TcpWriteOnEventListener extends ShepardSerialEventListener
   {
-    
-//    int i = 0;
-    
+        
     public TcpWriteOnEventListener()
     {
       super(port);
@@ -233,13 +266,11 @@ public class TcpCollectionServer extends CollectionServer
     @Override
     protected void handleData()
     {
-      clientOut.println(this.datapoint);
-      
-//      if (i % 100 == 0)
-//      {
-//        System.out.println("Sent " + this.datapoint + " to client");
-//      }
-//      ++i;
+      // verify that there's still a connection to the client
+      if (clientOut != null)
+      {
+        clientOut.println(this.datapoint);
+      }
     }
     
   }
