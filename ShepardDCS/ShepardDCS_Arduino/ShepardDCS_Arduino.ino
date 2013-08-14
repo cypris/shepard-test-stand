@@ -111,9 +111,11 @@ void loop() {
     Serial.write(tempValue & 0xff); //Second byte
       
     //Send the time stamp to the Processing app
-    Serial.write(0xfd); //ID/control byte so Processing can distinguish sensors
-    Serial.write((timeValue >> 8) & 0xff); //First byte
-    Serial.write(timeValue & 0xff); //Second byte 
+    Serial.write(0xfd); //ID/control byte so Processing can distinguish values
+    Serial.write((timeValue >> 24) & 0xffffff); //First byte
+    Serial.write((timeValue >> 16) & 0xffff); //Second byte
+    Serial.write((timeValue >> 8) & 0xff); //Third byte
+    Serial.write(timeValue & 0xff); //Fourth byte 
 
     //Make sure that all the characters get sent
     //Serial.flush();    
