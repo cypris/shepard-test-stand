@@ -153,11 +153,13 @@ class SerialInterface(DeviceInterface):
         # Start reading the data and storing it in the queue
         while True:
             # Read the control and data bytes from the device
-            control_byte = self.device.read(1)
-            data_bytes = self.device.read(2)
+            control_byte = self.device.read(1)            
 
             # Check to see which type of data we have coming back in
             if control_byte == b'\xff': # Thrust data                
+                # The thrust value is two bytes
+                data_bytes = self.device.read(2)
+
                 # Convert the raw thrust bytes to an integer
                 raw_thrust = struct.unpack(">h", data_bytes[0:2])[0]
 
@@ -169,6 +171,9 @@ class SerialInterface(DeviceInterface):
 
                 #print "Thrust Data:", calib_thrust
             elif control_byte == b'\xfe': # Temperature data
+                # The temperature value is two bytes
+                data_bytes = self.device.read(2)
+
                 # Convert the raw temperature bytes to an integer
                 raw_temperature = struct.unpack(">h", data_bytes[0:2])[0]
 
@@ -180,7 +185,10 @@ class SerialInterface(DeviceInterface):
 
                 #print "Temperature Data:", temperature
             elif control_byte == b'\xfd': # Timestamp data
-                time_stamp = struct.unpack(">h", data_bytes[0:2])[0]
+                # The time value is four bytes
+                data_bytes = self.device.read(4)
+
+                time_stamp = struct.unpack(">L", data_bytes[0:4])[0]
 
                 # Save our time stamp value so we can send it to the client
                 data_list.append(str(time_stamp))
