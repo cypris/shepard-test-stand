@@ -114,7 +114,8 @@ public abstract class ShepardSerialEventListener implements SerialPortEventListe
               }
               break;
             default :
-              System.out.println("Encountered unknown control code " + controlCode);
+              System.err.println("Encountered unknown control code " + controlCode);
+              controlCode = 0;
               break;
           }
           
