@@ -21,6 +21,7 @@ public class ClientlessCollectionServer extends CollectionServer
       if (port != null)
       {
         System.out.println("Initializing listener...");
+        // TODO: make the instantiation of the listener an abstract getter
         listener = new EchoListener();
         port.addEventListener(listener);
         port.writeByte(READY_COMMAND);
@@ -28,6 +29,7 @@ public class ClientlessCollectionServer extends CollectionServer
     }
   }
   
+  // TODO: move this to an instance of an abstract version of ClientlessCollectionServer
   private class EchoListener extends ShepardSerialEventListener
   {
     

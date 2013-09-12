@@ -78,8 +78,9 @@ public abstract class ShepardSerialEventListener implements SerialPortEventListe
         ByteArrayInputStream stream = new ByteArrayInputStream(buffer);
         
         // iterate over all of the available bytes and read the data
-        byte[] valbuf = new byte[2];
+        byte[] valbuf = new byte[4];
         int intval = 0;
+        long longval = 0;
         while (stream.available() > 0) 
         {
           // if there is no control code set from the last event, attempt
@@ -93,24 +94,24 @@ public abstract class ShepardSerialEventListener implements SerialPortEventListe
           switch (controlCode)
           {
             case 0xff : // thrust
-              intval = readShort(stream, valbuf);
+              intval = readUnsignedShort(stream, valbuf);
               if (intval != Integer.MIN_VALUE)
               {
                 datapoint.thrust = (0.0095566744f * (float)intval - 0.0652739447f) * 4.448f;
               }
               break;
             case 0xfe : // temperature
-              intval = readShort(stream, valbuf);
+              intval = readUnsignedShort(stream, valbuf);
               if (intval != Integer.MIN_VALUE)
               {
                 datapoint.temp = intval / 100.0f;
               }
               break;
             case 0xfd : // time stamp
-              intval = readShort(stream, valbuf);
+              longval = readUnsignedInteger(stream, valbuf);
               if (intval != Integer.MIN_VALUE)
               {
-                datapoint.time = intval;
+                datapoint.time = longval;
               }
               break;
             default :
@@ -142,30 +143,67 @@ public abstract class ShepardSerialEventListener implements SerialPortEventListe
       System.out.println(i + " data points, ~" + (int)rate + "Samples/s");
     }
   }
+
+  // TODO: move this to a super class
+  // TODO: Assess whether the stream is really needed
+  private boolean readBytes(ByteArrayInputStream stream, byte[] valbuf, int numBytes)
+      throws IOException 
+  {
+    boolean ret = false;
+    if (stream.available() >= numBytes) 
+    {
+      // read the bytes
+      stream.read(valbuf, 0, numBytes);
+      convBuf.put(valbuf);
+      convBuf.rewind();    // go back to the beginning for reading
+      
+      ret = true;
+    }
+    else
+    {
+      leftoverBytes = stream.read(leftover);
+    }
+    
+    return ret;
+  }
   
-  private int readShort(ByteArrayInputStream stream, byte[] valbuf) 
+  // TODO: move this to a super class
+  // TODO: Assess whether the stream is really needed
+  private int readUnsignedShort(ByteArrayInputStream stream, byte[] valbuf) 
       throws IOException
   {
     int ret = Integer.MIN_VALUE;
     
-    if (stream.available() > 1)
-    {
-      // read the bytes
-      stream.read(valbuf);
-      convBuf.put(valbuf);
-      convBuf.rewind();
-      
+    if (readBytes(stream, valbuf, 2))
+    {      
       // get the value they represent
-      ret = convBuf.getShort();
+      ret = convBuf.getShort() & 0xFFFF;
       
       convBuf.rewind();
 
       // reset the control code to indicate that that the current one was read
       controlCode = 0;
     }
-    else
-    {
-      leftoverBytes = stream.read(leftover);
+    
+    return ret;
+  }
+
+  // TODO: move this to a super class
+  // TODO: Assess whether the stream is really needed
+  private long readUnsignedInteger(ByteArrayInputStream stream, byte[] valbuf)
+      throws IOException
+  {
+    long ret = Integer.MIN_VALUE;
+    
+    if (readBytes(stream, valbuf, 4))
+    {      
+      // get the value they represent
+      ret = convBuf.getInt() & 0xFFFFFFFF;
+      
+      convBuf.rewind();
+
+      // reset the control code to indicate that that the current one was read
+      controlCode = 0;
     }
     
     return ret;

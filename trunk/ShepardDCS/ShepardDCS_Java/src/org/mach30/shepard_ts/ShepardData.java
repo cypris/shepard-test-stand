@@ -5,7 +5,7 @@ public class ShepardData
   
   public float thrust;
   public float temp;
-  public int time;
+  public long time;
   
   public ShepardData()
   {

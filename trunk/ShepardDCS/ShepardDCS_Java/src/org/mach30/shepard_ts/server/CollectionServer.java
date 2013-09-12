@@ -247,6 +247,8 @@ public abstract class CollectionServer
       }
     }
     
+    @SuppressWarnings("unused")
+    // TODO: figure out how to handle exceptions here, or if it's even useful to get one
     public Exception getException() {
       return ex;
     }
