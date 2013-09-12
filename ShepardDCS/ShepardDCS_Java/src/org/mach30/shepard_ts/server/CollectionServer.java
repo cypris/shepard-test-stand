@@ -1,5 +1,6 @@
 package org.mach30.shepard_ts.server;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
@@ -18,6 +19,7 @@ public abstract class CollectionServer
   private static final String STOP_BITS         = "-sbits";
   private static final String PARITY            = "-parity";
   private static final String CONNECTION_DELAY  = "-conxdelay";
+  private static final String CONNECTION_RETRYS = "-retrys";
   
   private static final byte DISCOVERY_COMMAND = (byte)0x44; // D
   protected static final byte READY_COMMAND = (byte)0x52; // R
@@ -29,6 +31,7 @@ public abstract class CollectionServer
   private int stopBits     = 1;
   private int parity       = 0;
   private int delay        = 2500;
+  private int retrys       = 2;
   
   protected SerialPort port = null;
   
@@ -38,11 +41,20 @@ public abstract class CollectionServer
   static boolean deviceConnected = false;
   
   protected String status = "";
+  protected boolean errorStatus = false;
   
   
   public CollectionServer() throws Exception
   {
     
+  }
+  
+  public final void init() throws Exception
+  {
+    List<String> args = new ArrayList<String>();
+    // although this currently just handles argument parsing, it could 
+    // conceivably handle more in the future
+    parseArgs(args);
   }
   
   /**
@@ -125,10 +137,13 @@ public abstract class CollectionServer
         {
           delay = intParam;
         }
+        else if (CONNECTION_RETRYS.equals(arg)) 
+        {
+          retrys = intParam;
+        }
       }      
     }
-  }
-  
+  }  
   
   private String[] getPortNames() {
     String[] portNames = null;
@@ -146,6 +161,19 @@ public abstract class CollectionServer
     return portNames;
   }
   
+  protected void setStatus(String message)
+  {
+    status = message;
+    System.out.println(status);
+  }
+  
+  protected void setErrorStatus(String message)
+  {
+    status = message;
+    errorStatus = true;
+    System.err.println(status);
+  }
+  
   
   private class PortDetector implements Runnable
   {
@@ -160,90 +188,92 @@ public abstract class CollectionServer
       String[] names = getPortNames();
       String name = null;
       
-      for (int portNameIdx = 0; portNameIdx < names.length; portNameIdx++)
+      for (int attempt = 0; attempt < retrys && currport == null; ++attempt)
       {
-        name = names[portNameIdx];
-
-        status = "Trying " + name;
-        System.out.print(status);
-        currport = new SerialPort(name);
+        setStatus("Starting attempt " + (attempt + 1) + " of " + retrys + " at connecting to the DAta Acquisition hardware");
         
-        try
-        {        
-          if (!currport.openPort())
-          {
-            status = "Failed to open port " + portName;
-            System.err.println(status);
-          }
-          else if (!currport.setParams(baudRate, dataBits, stopBits, parity))
-          {
-            status = "Unable to initialize serial connection";
-            System.err.println(status);
-          }
-          else
-          {
-            DetectionListener listener = new DetectionListener();
-            // currently, try to handle all the comm events, including flow
-            // control
-            currport.addEventListener(listener, SerialPort.MASK_RXCHAR
-              | SerialPort.MASK_RXFLAG | SerialPort.MASK_CTS
-              | SerialPort.MASK_DSR | SerialPort.MASK_RLSD);
-            
-            // delay for a bit to let the serial communications initialize
-            int delayPart = delay / 10;
-            for (int delayNum = 0; delayNum < 10; delayNum++)
+        for (int portNameIdx = 0; portNameIdx < names.length; portNameIdx++)
+        {
+          name = names[portNameIdx];
+  
+          setStatus("Trying " + name);
+          currport = new SerialPort(name);
+          
+          try
+          {        
+            if (!currport.openPort())
             {
-              System.out.print(".");
-              Thread.sleep(delayPart);
+              setErrorStatus("Failed to open port " + portName);
             }
-            
-            // write the discovery command to attempt communication
-            currport.writeByte(DISCOVERY_COMMAND);
-
-            // delay for a little bit longer, just-in-case
-            System.out.print(".");
-            Thread.sleep(delayPart);
-
-            // this is the end-of-line for the "Trying" message
-            System.out.println();
-            
-            // if a connection was detected, update the connected port and break
-            // out of the loop to stop discovery
-            if (listener.isConnected())
+            else if (!currport.setParams(baudRate, dataBits, stopBits, parity))
             {
-              currport.removeEventListener();
-              
-              port = currport;
-              
-              status = "Connected on port " + name;
-              System.out.println(status);
-              
-              deviceConnected = true;
-              
-              break;
+              setErrorStatus("Unable to initialize serial connection");
             }
             else
             {
-              currport.removeEventListener();
-              currport.closePort();
-              currport = null;
+              DetectionListener listener = new DetectionListener();
+              // currently, try to handle all the comm events, including flow
+              // control
+              currport.addEventListener(listener, SerialPort.MASK_RXCHAR
+                | SerialPort.MASK_RXFLAG | SerialPort.MASK_CTS
+                | SerialPort.MASK_DSR | SerialPort.MASK_RLSD);
+              
+              // delay for a bit to let the serial communications initialize
+              int delayPart = delay / 10;
+              for (int delayNum = 0; delayNum < 10; delayNum++)
+              {
+                System.out.print(".");
+                Thread.sleep(delayPart);
+              }
+              
+              // write the discovery command to attempt communication
+              currport.writeByte(DISCOVERY_COMMAND);
+  
+              // delay for a little bit longer, just-in-case
+              System.out.print(".");
+              Thread.sleep(delayPart);
+  
+              // this is the end-of-line for the "Trying" message
+              System.out.println();
+              
+              // if a connection was detected, update the connected port and break
+              // out of the loop to stop discovery
+              if (listener.isConnected())
+              {
+                currport.removeEventListener();
+                
+                port = currport;
+                
+                setStatus("Connected on port " + name);
+                
+                deviceConnected = true;
+                
+                break;
+              }
+              else
+              {
+                currport.removeEventListener();
+                currport.closePort();
+                currport = null;
+              }
             }
           }
+          catch (SerialPortException spex)
+          {
+            ex = new Exception("An error occurred initializing the serial connection", spex);
+          }
+          catch (InterruptedException iex)
+          {
+            ex = new Exception("An interrupt was encountered.", iex);
+          }
         }
-        catch (SerialPortException spex)
-        {
-          ex = new Exception("An error occurred initializing the serial connection", spex);
-        }
-        catch (InterruptedException iex)
-        {
-          ex = new Exception("An interrupt was encountered.", iex);
-        }
+        
+        setStatus("Attempt " + (attempt + 1) + " of " + retrys + " failed to locate the Data Acquisition hardware.");
       }
       
       if (currport == null)
       {
-        status = "Unable to connect to Data Collection Hardware";
-        System.err.println(status);
+        setErrorStatus("Unable to connect to Data Collection Hardware");
       }
     }
     

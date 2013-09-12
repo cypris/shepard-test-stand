@@ -101,7 +101,7 @@ public abstract class ShepardSerialEventListener implements SerialPortEventListe
               }
               break;
             case 0xfe : // temperature
-              intval = readUnsignedShort(stream, valbuf);
+              intval = readSignedShort(stream, valbuf);
               if (intval != Integer.MIN_VALUE)
               {
                 datapoint.temp = intval / 100.0f;
@@ -169,7 +169,7 @@ public abstract class ShepardSerialEventListener implements SerialPortEventListe
   
   // TODO: move this to a super class
   // TODO: Assess whether the stream is really needed
-  private int readUnsignedShort(ByteArrayInputStream stream, byte[] valbuf) 
+  private int readSignedShort(ByteArrayInputStream stream, byte[] valbuf) 
       throws IOException
   {
     int ret = Integer.MIN_VALUE;
@@ -177,7 +177,7 @@ public abstract class ShepardSerialEventListener implements SerialPortEventListe
     if (readBytes(stream, valbuf, 2))
     {      
       // get the value they represent
-      ret = convBuf.getShort() & 0xFFFF;
+      ret = convBuf.getShort();
       
       convBuf.rewind();
 
@@ -186,6 +186,14 @@ public abstract class ShepardSerialEventListener implements SerialPortEventListe
     }
     
     return ret;
+  }
+  
+  // TODO: move this to a super class
+  // TODO: Assess whether the stream is really needed
+  private int readUnsignedShort(ByteArrayInputStream stream, byte[] valbuf) 
+      throws IOException
+  {
+    return readSignedShort(stream, valbuf) & 0xFFFF;
   }
 
   // TODO: move this to a super class

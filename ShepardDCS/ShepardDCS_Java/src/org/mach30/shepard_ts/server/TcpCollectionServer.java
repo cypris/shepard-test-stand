@@ -134,6 +134,7 @@ public class TcpCollectionServer extends CollectionServer
         // connection
         try 
         {
+          System.out.println("Waiting for client connection...");
           clientSocket = serverSocket.accept();
           System.out.println("Established connection with client");
         }

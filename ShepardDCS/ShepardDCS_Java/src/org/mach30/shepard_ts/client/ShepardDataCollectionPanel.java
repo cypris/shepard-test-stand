@@ -5,12 +5,6 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.net.Socket;
-import java.net.UnknownHostException;
 
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
@@ -19,7 +13,10 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
 
-import org.mach30.shepard_ts.ShepardData;
+import jssc.SerialPortEventListener;
+
+import org.mach30.shepard_ts.server.CollectionServer;
+import org.mach30.shepard_ts.server.ShepardSerialEventListener;
 
 public class ShepardDataCollectionPanel extends JPanel implements ActionListener
 {
@@ -30,9 +27,7 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
   private ShepardDataPanel thrustPanel = null;
   private ShepardDataPanel tempPanel = null;
   
-  Socket sock = null;
-  PrintWriter out = null;
-  BufferedReader in = null;
+  boolean connected = false;
   
   JButton connectButton = null;
   JButton recordButton = null;
@@ -69,12 +64,6 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
     JLabel title = new JLabel("Shepard Test Stand");
     title.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 20));
     topPanel.add(title);
-    
-    JTextField server = new JTextField("localhost", 10);
-    server.setToolTipText("The name or address of the computer the Data " +
-        "Collection Server is located on.  If it is on the same computer as " +
-        "this application, the default value of 'localhost' is sufficient.");
-    topPanel.add(server);
     
     JTextField notation = new JTextField(10);
     notation.setToolTipText("The motor model or other notation about what " +
@@ -113,19 +102,14 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
   {
     if (event.getSource() == connectButton)
     {
-      // TODO: fix the logic here... it doesn't always work
-      if (sock != null)
-      {
-        disconnectFromServer();
-      }
-      else
+      if (!connected)
       {
         connectToServer();
       }
     }
     else if (event.getSource() == recordButton)
     {
-      if (sock != null && sock.isConnected())
+      if (connected)
       {
         if (recording)
         {
@@ -136,7 +120,6 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
         {
           recordButton.setText("Stop Recording");
           recording = true;
-          out.println("R");
         }
       }
     }
@@ -149,40 +132,72 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
     
   private void connectToServer()
   {
+    connectButton.setText("Connecting...");
     Thread t = new Thread(new ShepardServerCommunications(this));
     t.start();
   }
   
-  private void disconnectFromServer()
+  
+  private class ShepardGUICollectionServer extends CollectionServer
   {
-    if (sock.isConnected())
+
+    private Component parent = null;
+
+    public ShepardGUICollectionServer(Component parent) throws Exception
     {
-      try
+      super();
+      this.parent = parent;
+    }
+
+    @Override
+    public void handleClient() throws Exception
+    {
+      SerialPortEventListener listener = null;
+      while (listener == null)
       {
-        out.close();
-        in.close();
-        sock.close();
-      }
-      catch (IOException e)
-      {
+        Thread.sleep(10);
+        if (port != null)
+        {
+          System.out.println("Initializing listener...");
+          // TODO: make the instantiation of the listener an abstract getter
+          listener = new ShepardDataListener();
+          port.addEventListener(listener);
+          port.writeByte(READY_COMMAND);
+        }
+        else if (errorStatus) 
+        {
+          JOptionPane.showMessageDialog(parent, status);
+        }
       }
     }
     
-    out = null;
-    in = null;
-    sock = null;
+    
+    private class ShepardDataListener extends ShepardSerialEventListener
+    {
+      
+      public ShepardDataListener() 
+      {
+        super(port);
+      }
 
-    connectButton.setText(CONNECT);
-    recordButton.setEnabled(false);
-
-    recordButton.setText(RECORD);
-    recording = false;
-  }
-  
+      @Override
+      protected void handleData()
+      {
+        if (recording)
+        {
+          thrustPanel.addPoint(this.datapoint.thrust, this.datapoint.time);
+          tempPanel.addPoint(this.datapoint.temp, this.datapoint.time);
+        }
+      }
+      
+    }
+    
+  }  
   
   private class ShepardServerCommunications implements Runnable
   {
-    private Component parent;
+    
+    private Component parent = null;
     
     public ShepardServerCommunications(Component parent)
     {
@@ -192,67 +207,25 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
     @Override
     public void run()
     {
-      String host = "localhost";
-      
-      try
+      try 
       {
-        sock = new Socket(host, 9999);
-        out = new PrintWriter(sock.getOutputStream(), true);
-        in = new BufferedReader(new InputStreamReader(
-            sock.getInputStream()));
-      }
-      catch (UnknownHostException uhex)
-      {
-        System.err.println(uhex);
-        JOptionPane.showMessageDialog(parent, host
-            + " was not recognized as a valid host");
-        disconnectFromServer();
-      }
-      catch (IOException ioex)
-      {
-        System.err.println(ioex);
-        JOptionPane.showMessageDialog(parent,
-            "Unable to fully establish connection with server at " + host);
-        disconnectFromServer();
-      }
-      
-      connectButton.setText("Disconnect");
-      recordButton.setEnabled(true);
-      
-      try
-      {
-        String line = "";
-        ShepardData data = null;
-        while ((line = in.readLine()) != null)
-        {
-          if (Character.isLetter(line.charAt(0)))
-          {
-            System.out.println(line);
-          }
-          else
-          {
-            data = new ShepardData(line);
-            
-            if (recording)
-            {
-              thrustPanel.addPoint(data.thrust, data.time);
-              tempPanel.addPoint(data.temp, data.time);
-            }
-          }
-        }
+        CollectionServer server = new ShepardGUICollectionServer(parent);
+  
+        server.init();
+        server.listen();
+        server.handleClient();
+        
+        connected = true;
       }
       catch (Exception ex)
       {
         System.err.println(ex);
-        if (sock != null)
-        {
-          JOptionPane.showMessageDialog(parent,
-              "An error occurred receiving communications with the server");
-                    
-          disconnectFromServer();
-        }
-        sock = null;
+        JOptionPane.showMessageDialog(parent,
+            "Unable to fully establish connection with data collection hardware");
       }
+      connectButton.setText("Connected");
+      connectButton.setEnabled(false);
+      recordButton.setEnabled(true);
     }
     
   }
