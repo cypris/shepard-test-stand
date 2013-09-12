@@ -25,10 +25,12 @@ public class ShepardDataPanel extends JPanel
   private DataPointBar minBar = null;
   private DataPointBar avgBar = null;
   
-  private float max = Float.MIN_VALUE;
+  private float max = Float.NEGATIVE_INFINITY;
   private float min = Float.MAX_VALUE;
   private float sum = 0.0f;
   private float numPoints = 0.0f;
+  
+  private float yMax = min;
 
   public ShepardDataPanel(String yAxisTitle, float yAxisMax)  
   {
@@ -65,10 +67,12 @@ public class ShepardDataPanel extends JPanel
   
   public void setYAxisInfo(String yAxisTitle, float yAxisMax)
   {  
+    yMax = yAxisMax;
+    
     chart.getAxesXBottom().get(0).setAxisTitle(new AxisTitle("Time (ms)"));
     IAxis<?> yAxis = chart.getAxesYLeft().get(0);
     yAxis.setAxisTitle(new AxisTitle(yAxisTitle));
-    IRangePolicy rangePolicy = new RangePolicyFixedViewport(new Range(0, yAxisMax));
+    IRangePolicy rangePolicy = new RangePolicyFixedViewport(new Range(0, yMax));
     yAxis.setRangePolicy(rangePolicy);
   }
 
@@ -76,7 +80,7 @@ public class ShepardDataPanel extends JPanel
   {
     trace.removeAllPoints();
     max = 0;
-    min = 42.0f;
+    min = yMax;
   }
 
   public void addPoint(float val, long timestamp)
