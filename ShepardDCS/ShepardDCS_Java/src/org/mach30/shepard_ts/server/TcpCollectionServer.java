@@ -78,6 +78,7 @@ public class TcpCollectionServer extends CollectionServer
       if (port != null)
       {
         System.out.println("Initializing listener...");
+        // TODO: make an abstract getter for the listener
         listener = new TcpWriteOnEventListener();
         port.addEventListener(listener);
       }
@@ -255,6 +256,7 @@ public class TcpCollectionServer extends CollectionServer
   }
   
 
+  // TODO: move this to an implementation of the abstract TcpCollectionServer
   private class TcpWriteOnEventListener extends ShepardSerialEventListener
   {
         
