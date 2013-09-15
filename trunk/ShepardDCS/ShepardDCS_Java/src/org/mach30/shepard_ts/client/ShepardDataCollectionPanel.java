@@ -5,7 +5,6 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.DateFormat;
@@ -30,12 +29,13 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
   
   private static final String CONNECT = "Connect";
   private static final String RECORD = "Record";
+  private static final String CSV_HEADER = "TIME(ms),THRUST(N),TEMPERATURE(c)";
 
   
   private boolean connected = false;  
   private boolean recording = false;
   private UserPreferences preferences = UserPreferences.getInstance();
-  private FileOutputStream output = null;
+  private FileOutputStream csvOutput = null;
   
   private ShepardDataPanel thrustPanel = null;
   private ShepardDataPanel tempPanel = null;
@@ -125,6 +125,7 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
     {
       if (!connected)
       {
+        // currently no option to disconnect
         connectToServer();
       }
     }
@@ -134,32 +135,41 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
       {
         if (recording)
         {
+          // if recording, disable recording and close the output file.
           recordButton.setText(RECORD);
           recording = false;
           
           try
           {
-            output.close();
+            csvOutput.close();
           }
           catch (IOException e)
           {
           }
-          output = null;
+          csvOutput = null;
         }
         else
         {
+          // try to open the output file.  if it succeeds without issue, the header line is
+          // appended to the file and the record state is enabled.
           try
           {
-            output = new FileOutputStream(getFileName());
+            csvOutput = new FileOutputStream(getFileName());
+            
+            // add the header
+            addLineToCSV(CSV_HEADER);
             
             recordButton.setText("Stop Recording");
             recording = true;
           }
-          catch (FileNotFoundException e)
+          catch (IOException e)
           {
-            output = null;
-            JOptionPane.showMessageDialog(this, "Unable to open the output file for writing.  Make sure you have permission to write to " + 
-                preferences.getPreference(UserPreferences.SAVE_LOCATION_PROP) + " or change your default save location under Preferences.");
+            csvOutput = null;
+            JOptionPane.showMessageDialog(
+                this,
+                "Unable to open the output file for writing.  Make sure you have permission " +
+                "to write to " + preferences.getPreference(UserPreferences.SAVE_LOCATION_PROP) + 
+                " or change your default save location under Preferences.");
           }
         }
       }
@@ -171,6 +181,7 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
     }
     else if (event.getSource() == prefButton)
     {
+      // open the preferences panel, initializing it if necessary
       if (prefPanel == null)
       {
         prefPanel = PreferencesPanel.getPanel();
@@ -183,6 +194,8 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
     }
     else if (event.getSource() == prefPanel)
     {
+      // retrieve the updated preferences.  this may not be necessary since there should only be one
+      // instance of the preferences.
       preferences = prefPanel.getPreferences();
     }
   }
@@ -194,6 +207,13 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
     t.start();
   }
   
+  /**
+   * Get the current name of the output file.  The name is based upon the current date/time, and 
+   * includes the notation that the user has specified.  The notation string is also modified to 
+   * replace special characters (such as directory separators) with an underscore.
+   * @return The user specified notation prefixed with the current date/time stamp, with a CSV 
+   *     extension.
+   */
   private String getFileName()
   {
     DateFormat format = new SimpleDateFormat("yyyy-MM-dd__HH_mm");
@@ -205,12 +225,23 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
     String notationStr = notation.getText().trim();
     if (!notationStr.isEmpty()) 
     {
-      ret += "__" + notationStr;
+      ret += "__" + notationStr.replaceAll(" \t/\\:", "_");
     }
     
     ret += ".csv";
     
     return ret;
+  }
+  
+  /**
+   * Append a line to the CSV file.  A newline character is added after the string is written.
+   * @param str A string to append
+   * @throws IOException
+   */
+  private void addLineToCSV(String str) throws IOException
+  {
+    csvOutput.write(str.getBytes());
+    csvOutput.write('\n');
   }
   
   
@@ -269,8 +300,7 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
           
           try
           {
-            output.write(this.datapoint.toString().getBytes());
-            output.write('\n');
+            addLineToCSV(this.datapoint.toString());
           }
           catch (IOException e)
           {
