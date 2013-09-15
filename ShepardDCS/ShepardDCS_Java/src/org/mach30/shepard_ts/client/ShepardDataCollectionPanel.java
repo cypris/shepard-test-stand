@@ -5,9 +5,16 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -23,17 +30,22 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
   
   private static final String CONNECT = "Connect";
   private static final String RECORD = "Record";
+
+  
+  private boolean connected = false;  
+  private boolean recording = false;
+  private UserPreferences preferences = UserPreferences.getInstance();
+  private FileOutputStream output = null;
   
   private ShepardDataPanel thrustPanel = null;
   private ShepardDataPanel tempPanel = null;
   
-  boolean connected = false;
-  
-  JButton connectButton = null;
-  JButton recordButton = null;
-  JButton clearButton = null;
-  
-  boolean recording = false;
+  private JTextField notation = null;
+  private JButton connectButton = null;
+  private JButton recordButton = null;
+  private JButton clearButton = null;
+  private JButton prefButton = null;
+  private PreferencesPanel prefPanel = null;
 
   public ShepardDataCollectionPanel()
   {
@@ -65,10 +77,10 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
     title.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 20));
     topPanel.add(title);
     
-    JTextField notation = new JTextField(10);
+    notation = new JTextField(10);
     notation.setToolTipText("The motor model or other notation about what " +
         "the data being recorded is about");
-    topPanel.add(notation);
+    topPanel.add(notation);    
     
     connectButton = new JButton(CONNECT);
     connectButton.addActionListener(this);
@@ -86,6 +98,15 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
     clearButton.addActionListener(this);
     recordButton.setToolTipText("Clear the data currently graphed");
     topPanel.add(clearButton);
+
+    prefButton = new JButton("Preferences");
+    prefButton.addActionListener(this);
+    prefButton.setToolTipText("Set application preferences");
+    topPanel.add(prefButton);
+
+    JFileChooser fileChooser = new JFileChooser();
+    fileChooser.setToolTipText("The location to save recorded data");
+    fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
 
     add(topPanel);
         
@@ -115,11 +136,31 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
         {
           recordButton.setText(RECORD);
           recording = false;
+          
+          try
+          {
+            output.close();
+          }
+          catch (IOException e)
+          {
+          }
+          output = null;
         }
         else
         {
-          recordButton.setText("Stop Recording");
-          recording = true;
+          try
+          {
+            output = new FileOutputStream(getFileName());
+            
+            recordButton.setText("Stop Recording");
+            recording = true;
+          }
+          catch (FileNotFoundException e)
+          {
+            output = null;
+            JOptionPane.showMessageDialog(this, "Unable to open the output file for writing.  Make sure you have permission to write to " + 
+                preferences.getPreference(UserPreferences.SAVE_LOCATION_PROP) + " or change your default save location under Preferences.");
+          }
         }
       }
     }
@@ -128,6 +169,22 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
       thrustPanel.clear();
       tempPanel.clear();
     }
+    else if (event.getSource() == prefButton)
+    {
+      if (prefPanel == null)
+      {
+        prefPanel = PreferencesPanel.getPanel();
+        prefPanel.addActionListener(this);
+      }
+      else
+      {
+        prefPanel.reopen();
+      }
+    }
+    else if (event.getSource() == prefPanel)
+    {
+      preferences = prefPanel.getPreferences();
+    }
   }
     
   private void connectToServer()
@@ -135,6 +192,25 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
     connectButton.setText("Connecting...");
     Thread t = new Thread(new ShepardServerCommunications(this));
     t.start();
+  }
+  
+  private String getFileName()
+  {
+    DateFormat format = new SimpleDateFormat("yyyy-MM-dd__HH_mm");
+    
+    String ret = new String();
+    ret += preferences.getPreference(UserPreferences.SAVE_LOCATION_PROP);
+    ret += format.format(new Date());
+    
+    String notationStr = notation.getText().trim();
+    if (!notationStr.isEmpty()) 
+    {
+      ret += "__" + notationStr;
+    }
+    
+    ret += ".csv";
+    
+    return ret;
   }
   
   
@@ -160,7 +236,7 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
         {
           System.out.println("Initializing listener...");
           // TODO: make the instantiation of the listener an abstract getter
-          listener = new ShepardDataListener();
+          listener = new ShepardDataListener(parent);
           port.addEventListener(listener);
           port.writeByte(READY_COMMAND);
         }
@@ -175,9 +251,12 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
     private class ShepardDataListener extends ShepardSerialEventListener
     {
       
-      public ShepardDataListener() 
+      private Component parent = null;
+      
+      public ShepardDataListener(Component parent) 
       {
         super(port);
+        this.parent = parent;
       }
 
       @Override
@@ -187,6 +266,17 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
         {
           thrustPanel.addPoint(this.datapoint.thrust, this.datapoint.time);
           tempPanel.addPoint(this.datapoint.temp, this.datapoint.time);
+          
+          try
+          {
+            output.write(this.datapoint.toString().getBytes());
+            output.write('\n');
+          }
+          catch (IOException e)
+          {
+            recording = false;
+            JOptionPane.showMessageDialog(parent, "An error occurred appending data to the data file.  Recording has automatically been stopped.");
+          }
         }
       }
       

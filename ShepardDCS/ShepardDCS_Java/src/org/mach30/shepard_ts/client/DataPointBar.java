@@ -65,6 +65,7 @@ public class DataPointBar extends JPanel
     g.setColor(Color.BLUE);
     g.fillRect(9, height + 8 - barHeight, width - 17, barHeight - 32);
 
+    g.setColor(Color.RED);
     g.setFont(Font.getFont(Font.MONOSPACED));
     ((Graphics2D)g).rotate(1.57079633);
     g.drawString(datapointLabel, 10, -12);
