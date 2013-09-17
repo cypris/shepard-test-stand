@@ -29,7 +29,10 @@ import controlP5.*; //Our graphics library
 
 boolean isReady = false; //Whether or not we're ready to receive data
 boolean serialAvail = false; //Tracks whether or not we have any serial ports
-char clientReady = 'R'; //The byte that tells the Arduino we're ready to start receiving data
+boolean serialEnabled = false; //Tracks whether or not we can start reading from the serial port
+char clientReadyMsg = 'R'; //The byte that tells the Arduino we're ready to start receiving data
+char endMsg = 'Q'; //The byte that tells the Arduino we want to end communications //TODO: Implement an exit button to do this for us
+char discoverMsg = 'D'; //The byte that tells the Arduino that we've searching for it
 int X_AXIS = 1; //Specifier for an X-axis gradient
 int Y_AXIS = 2; //Specifier for a Y-axis gradient
 int dataID; //The ID used to separate between types of data coming from the Arduino
@@ -43,8 +46,8 @@ Button savePointButton; //Allows the user to save the current raw/real value pai
 Button clearButton; //Clears the calibration
 Button saveCalibButton; //Save the calibration
 DropdownList ddl1; //The drop down list holding the serial ports
-String[] serialPorts = Serial.list();//new String[Serial.list().length]; //The serial ports that are available on the system
-Serial serialPort; //Currently, we talk over the serial/USB cable to the Arduino
+String[] serialPorts; //Serial.list();//new String[Serial.list().length]; //The serial ports that are available on the system
+Serial serialPort = null; //Currently, we talk over the serial/USB cable to the Arduino
 M30TextBox txtCalibPoints; //The calibration points that have already been recorded
 M30Chart chrtCalibPoints; //The calibration curve
 
@@ -119,36 +122,10 @@ void setup()
     .setColorValue(0xffffffff)
     .setFont(createFont("arial", 9));
   
-  //Make sure that there are some serial ports
-  if(serialPorts.length > 0) {
-    //Create and add the dropdown list
-    ddl1 = cp5.addDropdownList(Serial.list()[0], 660, 75, 100, 40);
-    ddl1.setItemHeight(18);
-    ddl1.setBarHeight(18);
-    ddl1.captionLabel().style().marginTop = 5;
-  
-    //Step through and add all of the serial ports to the dropdown list
-    for(int i = 0; i < serialPorts.length; i++) {
-      ddl1.addItem(serialPorts[i], i);
-    }
-    
-    //The serial port that the Arduino is connected to
-    serialPort = new Serial(this, Serial.list()[0], 115200);
-    
-    //Keep track of the fact that there are serial ports available
-    serialAvail = true;
-  }
-  else {
-    //Tells the user that there are no serial ports available
-    cp5.addTextlabel("label2")
-      .setText("NONE AVAILABLE")
-      .setPosition(660,60)
-      .setColorValue(0xffff0000)
-      .setFont(createFont("arial", 9));
-      
-      //Keep track of the fact that there is no serial port available
-      serialAvail = false;
-  }
+  ddl1 = cp5.addDropdownList(Serial.list()[0], 660, 75, 100, 40);
+  ddl1.setItemHeight(18);
+  ddl1.setBarHeight(18);
+  ddl1.captionLabel().style().marginTop = 5;
     
   //Sets the file name prefix to be the motor model number
   txtRawValue= cp5.addTextfield("RAW VALUE")
@@ -183,6 +160,12 @@ void setup()
   
   //Set up the chart that will track our progress on the calibration
   chrtCalibPoints = new M30Chart("CALIBRATION CURVE", 115, 90, 680, 500, true, 0, 1);
+  
+  //Call the method that will find out what serial ports are available and set up our drop down
+  SetupSerial();
+
+  //Allows us to add a handler for when the application Window is closed
+  prepareExitHandler();
 }
 
 /*Draws the GUI and all its components for us*/
@@ -194,18 +177,8 @@ void draw() {
   txtCalibPoints.draw();
   chrtCalibPoints.draw();
   
-  //If we haven't started receiving yet, ask the Arduino for data
-  //We have to keep trying until the serial port is up and running
-  while (serialPort.available() == 0 && !isReady) {
-      //Tell the Arduino we're ready
-      serialPort.write(clientReady);  
-  
-      //Take a short break
-      delay(100);    
-  }
-  
   //Make sure that we have a serial port available
-  if(serialAvail) {
+  if(serialEnabled) {
     //As long as we're getting data keep looping and reading from the port
     while (serialPort.available() >= 3) {
       //Make sure we don't keep asking for the Arduino to start sending data
@@ -226,14 +199,32 @@ void draw() {
   }
 }
 
-/*Called when the dropdown list is changed*/
-void controlEvent(ControlEvent theEvent) {
-  if (theEvent.isGroup()) {
-    //Stop the serial port so that it can be reset
-    serialPort.stop();
-    
-    //Set the Arduino serial port to the new value
-    serialPort = new Serial(this, serialPorts[int(theEvent.group().value())], 115200);
+/*
+ * Called when the dropdown list is changed
+ */
+void controlEvent(ControlEvent theEvent) {  
+  if (theEvent.isGroup()) {     
+    //Check to make sure we have serial ports available
+    if (ddl1.getItem((int)theEvent.value()).getName() != "None Available") {      
+      //Check to make sure the serial port is already running
+      if (serialPort != null) {     
+        //Stop the serial port so that it can be reset
+        serialPort.stop();
+      }
+      
+      //Set the Arduino serial port to the new value
+      serialPort = new Serial(this, serialPorts[int(theEvent.group().value())], 115200);
+      
+      //Let the rest of the code know that we can read from serial now
+      serialEnabled = true;
+      
+      //Wait for the serial port to get up and going
+      delay(2500);
+                        
+      //Tell the Arduino we're ready
+      serialPort.write(clientReadyMsg);
+      //serialPort.write(82);      
+    }        
   }
 }
 
@@ -297,4 +288,90 @@ void setGradient(int x, int y, float w, float h, color c1, color c2, int axis ) 
       line(i, y, i, y+h);
     }
   }
+}
+
+/*
+ * Sets up the serial related drop down
+ */
+public void SetupSerial() {
+  char character; //The character we're waiting for during autodiscovery
+  
+  //Check to see if there are any serial ports
+  if (Serial.list().length == 0) {
+    ddl1.addItem("None Available", 0);
+  }
+  else if (Serial.list().length > 0) {
+    //Get a list of the seril ports on the system
+    serialPorts = Serial.list();
+    
+    //Step through and add all of the serial ports to the dropdown list
+    for(int i = 0; i < serialPorts.length; i++) {
+      ddl1.addItem(serialPorts[i], i);     
+      
+      //Set the Arduino serial port to the new value
+      /*serialPort = new Serial(this, serialPorts[i], 115200);
+      
+      //Wait for the serial port to get up and going
+      delay(2500);
+      
+      //Try to send the discovery character to the port to see what happens      
+      serialPort.write(discoverMsg);
+      println("HERE1");
+      //Wait for a few cycles for a response
+      while (serialPort.available() == 0) {
+        //TODO: Wait for a number of milliseconds before moving onto the next port
+      }
+      println("HERE2");
+                     
+      //Figure out if we got the discovery character back
+      character = serialPort.readChar();
+      
+      println(character);
+      
+      //Check to see what character we got
+      if (character == 'D') {
+        break;
+        //TODO: Put the autoselect code in here to select the right serial port
+      }      
+      
+      //Stop the serial port so that it can be reset
+      serialPort.stop();*/
+    }    
+  }
+}
+
+/*
+ * Allows us to set things up to be shut down when the application window closes.
+ */
+private void prepareExitHandler() {
+  Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+    public void run () {      
+      try {          
+        //Call the method/function that will clean up for us before exit
+        stop();
+      }
+      catch (Exception ex) {
+          ex.printStackTrace(); // not much else to do at this point
+      }             
+   }
+  }));
+}
+
+private void Exit() {
+  //Let the Arduino know that we want to disconnect
+  serialPort.write(endMsg);
+ 
+  //Stop the serial port
+  serialPort.stop();
+  
+  //Exit the application
+  exit();
+}
+
+/*
+ * Called when the window is closed so we can clean up
+ */
+void stop() {   
+  //Stop the serial port
+  serialPort.stop(); 
 }
