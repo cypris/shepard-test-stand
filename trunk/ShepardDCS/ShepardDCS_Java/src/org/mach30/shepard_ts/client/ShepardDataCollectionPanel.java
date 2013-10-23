@@ -1,5 +1,6 @@
 package org.mach30.shepard_ts.client;
 
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -7,6 +8,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.net.URL;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -55,18 +57,18 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
   @Override
   public Dimension getMinimumSize()
   {
-    return new Dimension(640, 480);
+    return new Dimension(854, 480);
   }
   
   @Override
   public Dimension getPreferredSize()
   {
-    return new Dimension(800, 600);
+    return new Dimension(1000, 600);
   }
   
   private void initUI()
   {
-    BoxLayout layout = new BoxLayout(this, BoxLayout.PAGE_AXIS);
+    BoxLayout layout = new BoxLayout(this, BoxLayout.LINE_AXIS);
     this.setLayout(layout);
     
     JPanel topPanel = new JPanel();
@@ -107,14 +109,40 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
     JFileChooser fileChooser = new JFileChooser();
     fileChooser.setToolTipText("The location to save recorded data");
     fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-
-    add(topPanel);
+    
+    JPanel leftPanel = new JPanel();
+    BoxLayout leftLayout = new BoxLayout(leftPanel, BoxLayout.PAGE_AXIS);
+    leftPanel.setLayout(leftLayout);
+    
+    leftPanel.add(topPanel);
         
     thrustPanel = new ShepardDataPanel("Thrust (N)", 42);
-    add(thrustPanel);
+    leftPanel.add(thrustPanel);
     tempPanel = new ShepardDataPanel("Temperature (C)", 380);
-    add(tempPanel);
+    leftPanel.add(tempPanel);
     
+    add(leftPanel);
+
+    JPanel rightPanel = new JPanel();
+    BoxLayout rightLayout = new BoxLayout(rightPanel, BoxLayout.PAGE_AXIS);
+    rightPanel.setLayout(rightLayout);
+    rightPanel.setBackground(Color.WHITE);
+    
+    URL shepardLogoPath = this.getClass().getResource("/resources/images/Shepard-200px.png");
+    ImagePanel shepardLogo = new ImagePanel(shepardLogoPath);
+    rightPanel.add(shepardLogo);
+    
+    URL mach30LogoPath = this.getClass().getResource("/resources/images/Mach30stacked-lt-200px.png");
+    ImagePanel mach30Logo = new ImagePanel(mach30LogoPath);
+    rightPanel.add(mach30Logo);
+    
+    URL schoolFactoryLogoPath = this.getClass().getResource("/resources/images/school_factory-200px.png");
+    ImagePanel schoolFactoryLogo = new ImagePanel(schoolFactoryLogoPath);
+    rightPanel.add(schoolFactoryLogo);
+    
+    add(rightPanel);
+
+    setBackground(Color.WHITE);
     setVisible(true);
   }
 
@@ -274,6 +302,7 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
         else if (errorStatus) 
         {
           JOptionPane.showMessageDialog(parent, status);
+          break;
         }
       }
     }
