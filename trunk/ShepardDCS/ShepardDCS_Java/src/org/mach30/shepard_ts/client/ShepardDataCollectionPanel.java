@@ -136,10 +136,6 @@ public class ShepardDataCollectionPanel extends JPanel implements ActionListener
     ImagePanel mach30Logo = new ImagePanel(mach30LogoPath);
     rightPanel.add(mach30Logo);
     
-    URL schoolFactoryLogoPath = this.getClass().getResource("/resources/images/school_factory-200px.png");
-    ImagePanel schoolFactoryLogo = new ImagePanel(schoolFactoryLogoPath);
-    rightPanel.add(schoolFactoryLogo);
-    
     add(rightPanel);
 
     setBackground(Color.WHITE);
