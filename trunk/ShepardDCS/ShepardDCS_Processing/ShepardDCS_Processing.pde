@@ -486,7 +486,16 @@ public void ReadSerial() {
         curTime = ((serialPort.read() << 24) | (serialPort.read() << 16) | (serialPort.read() << 8) | (serialPort.read()));
         
         //Make sure that the user wants to record before you add the data to the charts
-        if(recordButton.getBooleanValue() && curThrust > triggerThrust) {            
+        if(recordButton.getBooleanValue() && curThrust > triggerThrust) {
+          //Check to see if we have a bad sample that we should discard
+          if(curTime < 0) {
+            // Remove the last thrust and temp values to discard the entire sample
+            thrustVals.remove(thrustVals.size() - 1);
+            tempVals.remove(tempVals.size() - 1);
+            
+            break;
+          }
+          
           //Update the run time
           runTime = (curTime - startMillis) / 1000.0f;                   
             
